@@ -1,0 +1,121 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 0.1 Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 1. Health Check
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // 2. Therapists
+    // Fields: id, name, email, createdAt
+    function isValidTherapist(data) {
+      return data.keys().hasAll(['id', 'name', 'email'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.email is string && data.email.size() <= 100
+        && (data.get('createdAt', '') is string);
+    }
+
+    match /therapists/{therapistId} {
+      allow read: if isOwner(therapistId);
+      allow create: if isOwner(therapistId) && isValidTherapist(incoming());
+      allow update: if isOwner(therapistId) && isValidTherapist(incoming()) 
+                     && incoming().id == existing().id;
+    }
+
+    // 3. Children
+    // Fields: id, therapistId, name, age, avatar, learningLevel, points, stars, etc.
+    function isValidChild(data) {
+      return data.keys().hasAll(['id', 'therapistId', 'name', 'age'])
+        && data.id is string && data.id.size() <= 128
+        && data.therapistId is string && data.therapistId.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.age is int && data.age >= 0 && data.age <= 100;
+    }
+
+    match /children/{childId} {
+      // Allow list queries if they filter by therapistId
+      allow list: if isSignedIn() && (
+        resource.data.therapistId == request.auth.uid || 
+        childId == request.auth.uid
+      );
+      // Allow single document get
+      allow get: if isSignedIn() && (
+        resource.data.therapistId == request.auth.uid || 
+        childId == request.auth.uid
+      );
+
+      allow create: if isSignedIn() 
+        && incoming().therapistId == request.auth.uid 
+        && isValidChild(incoming());
+
+      allow update: if isSignedIn() 
+        && (existing().therapistId == request.auth.uid || childId == request.auth.uid)
+        && isValidChild(incoming())
+        && incoming().therapistId == existing().therapistId;
+
+      // Sessions Subcollection
+      match /sessions/{sessionId} {
+        function getChild() {
+          return get(/databases/$(database)/documents/children/$(childId)).data;
+        }
+        
+        allow read: if isSignedIn() && (
+          getChild().therapistId == request.auth.uid || 
+          childId == request.auth.uid
+        );
+        
+        allow create: if isSignedIn() && (
+          getChild().therapistId == request.auth.uid || 
+          childId == request.auth.uid
+        );
+      }
+
+      // Live Commands Subcollection
+      match /liveCommands/{commandId} {
+        function getChild() {
+          return get(/databases/$(database)/documents/children/$(childId)).data;
+        }
+
+        allow read: if isSignedIn() && (
+          getChild().therapistId == request.auth.uid || 
+          childId == request.auth.uid
+        );
+        
+        allow create: if isSignedIn() && (
+          getChild().therapistId == request.auth.uid
+        );
+        
+        allow delete: if isSignedIn() && (
+          childId == request.auth.uid
+        );
+      }
+    }
+  }
+}

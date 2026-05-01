@@ -1,0 +1,6 @@
+{
+  "name": "Aventura del Lenguaje",
+  "description": "Una aplicación educativa y terapéutica gamificada para niños de 4 a 8 años para mejorar habilidades lingüísticas.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["AI Chatbot", "Gamification", "Therapist Dashboard"]
+}

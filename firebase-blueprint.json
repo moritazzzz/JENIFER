@@ -1,0 +1,100 @@
+{
+  "entities": {
+    "Therapist": {
+      "title": "Therapist",
+      "description": "User with therapist role who monitors children's progress.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "email", "createdAt"]
+    },
+    "Child": {
+      "title": "Child",
+      "description": "The student/patient using the app for learning.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "therapistId": { "type": "string" },
+        "name": { "type": "string" },
+        "age": { "type": "integer" },
+        "avatar": { "type": "string" },
+        "themeColor": { "type": "string" },
+        "assistantVoice": { "type": "string", "enum": ["male", "female"] },
+        "learningLevel": { "type": "string", "enum": ["presilábico", "silábico", "alfabético"] },
+        "difficulty": { "type": "string", "enum": ["easy", "medium", "hard"] },
+        "learningStyle": { "type": "string", "enum": ["visual", "auditivo", "escritura"] },
+        "sessionDuration": { "type": "integer" },
+        "points": { "type": "integer" },
+        "stars": { "type": "integer" },
+        "lastSessionAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "therapistId", "name", "age"]
+    },
+    "Session": {
+      "title": "Session",
+      "description": "A single learning session recorded for a child.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "childId": { "type": "string" },
+        "therapistId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "levelReached": { "type": "string" },
+        "difficultyWorked": { "type": "string" },
+        "correctCount": { "type": "integer" },
+        "incorrectCount": { "type": "integer" },
+        "totalWords": { "type": "integer" },
+        "pointsEarned": { "type": "integer" },
+        "starsEarned": { "type": "integer" },
+        "timeSpent": { "type": "integer" },
+        "chatHistory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "role": { "type": "string", "enum": ["user", "assistant"] },
+              "content": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      },
+      "required": ["id", "childId", "therapistId", "date"]
+    },
+    "LiveCommand": {
+      "title": "Live Command",
+      "description": "Real-time command sent by therapist to child session.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["message", "confetti", "sparkle"] },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "type", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/therapists/{therapistId}": {
+      "schema": "Therapist",
+      "description": "Collection of therapist users."
+    },
+    "/children/{childId}": {
+      "schema": "Child",
+      "description": "Collection of children managed by therapists."
+    },
+    "/children/{childId}/sessions/{sessionId}": {
+      "schema": "Session",
+      "description": "Detailed session history for a specific child."
+    },
+    "/children/{childId}/liveCommands/{commandId}": {
+      "schema": "LiveCommand",
+      "description": "Commands for real-time interaction."
+    }
+  }
+}
