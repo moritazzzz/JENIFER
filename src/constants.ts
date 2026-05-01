@@ -27,6 +27,9 @@ export const WORLDS = {
       { id: 'v-3', title: 'Sonido I', word: 'Isla', syllables: 'Is... la', points: 20, hint: 'Rodeada de agua', pronunciationTip: 'Muestra tus dientitos y di I.' },
       { id: 'v-4', title: 'Sonido O', word: 'Oso', syllables: 'O... so', points: 20, hint: 'Es muy peludo', pronunciationTip: 'Pon tus labios redonditos como un círculo.' },
       { id: 'v-5', title: 'Sonido U', word: 'Uva', syllables: 'U... va', points: 20, hint: 'Fruta redondita', pronunciationTip: 'Lleva tus labios hacia adelante como un silbido.' },
+      { id: 'v-6', title: 'Luna Llena', word: 'Luna', syllables: 'Lu... na', points: 15, hint: 'Sale de noche', pronunciationTip: 'Sube la puntita de la lengua al techo de la boca.' },
+      { id: 'v-7', title: 'Sol Brillante', word: 'Sol', syllables: 'Sol', points: 15, hint: 'Sale de día', pronunciationTip: 'Sopla aire entre tus dientes suavemente.' },
+      { id: 'v-8', title: 'Mesa Madera', word: 'Mesa', syllables: 'Me... sa', points: 15, hint: 'Donde comemos', pronunciationTip: 'Junta tus labios con fuerza y haz un sonido.' },
     ]
   },
   medium: {
@@ -40,6 +43,9 @@ export const WORLDS = {
       { id: 'm-3', title: 'Coche Veloz', image: '🚗', word: 'Carro', syllables: 'Ca... rro', points: 30, pronunciationTip: 'Haz que tu lengua vibre suavemente para la R.' },
       { id: 'm-4', title: 'Elefante Grande', image: '🐘', word: 'Elefante', syllables: 'E... le... fan... te', points: 40, pronunciationTip: 'Pega los dientes de arriba con el labio de abajo para la F.' },
       { id: 'm-5', title: 'Mariposa Colorida', image: '🦋', word: 'Mariposa', syllables: 'Ma... ri... po... sa', points: 40, pronunciationTip: 'M junta los labios, S como una serpiente.' },
+      { id: 'm-6', title: 'Panda Comelón', image: '🐼', word: 'Panda', syllables: 'Pan... da', points: 35, pronunciationTip: 'Explota tus labios para la P.' },
+      { id: 'm-7', title: 'Banano Dulce', image: '🍌', word: 'Banano', syllables: 'Ba... na... no', points: 35, pronunciationTip: 'Junta los labios suave para la B.' },
+      { id: 'm-8', title: 'Gato Suave', image: '🐱', word: 'Gato', syllables: 'Ga... to', points: 35, pronunciationTip: 'Haz el sonido desde el fondo de tu garganta.' },
     ]
   },
   hard: {
@@ -48,11 +54,12 @@ export const WORLDS = {
     color: 'from-purple-500 to-pink-600',
     icon: '🌋',
     activities: [
-      { id: 'h-1', title: 'Mi Hogar', word: 'La casa es azul', points: 50, pronunciationTip: 'Tómate tu tiempo en cada palabra, respira profundo.' },
-      { id: 'h-2', title: 'Mejor Amigo', word: 'El perro corre', points: 50, pronunciationTip: 'Haz mucha fuerza con la lengua para que vibre fuerte la R.' },
-      { id: 'h-3', title: 'Aprender', word: 'Voy a la escuela', points: 60, pronunciationTip: 'Escucha los sonidos S en medio de las palabras.' },
-      { id: 'h-4', title: 'Diversión', word: 'Juego en el parque', points: 60, pronunciationTip: 'La J suena como un suspiro fuerte desde la garganta.' },
-      { id: 'h-5', title: 'Cena Rica', word: 'Como mucha fruta', points: 70, pronunciationTip: 'Une todas las palabras suavemente como un caminito.' },
+      { id: 'h-1', title: 'Mi Hogar', word: 'La casa es azul', syllables: 'La... ca... sa... es... a... zul', points: 50, pronunciationTip: 'Tómate tu tiempo en cada palabra, respira profundo.' },
+      { id: 'h-2', title: 'Mejor Amigo', word: 'El perro corre', syllables: 'El... pe... rro... co... rre', points: 50, pronunciationTip: 'Haz mucha fuerza con la lengua para que vibre fuerte la R.' },
+      { id: 'h-3', title: 'Aprender', word: 'Voy a la escuela', syllables: 'Voy... a... la... es... cue... la', points: 60, pronunciationTip: 'Escucha los sonidos S en medio de las palabras.' },
+      { id: 'h-4', title: 'Diversión', word: 'Juego en el parque', syllables: 'Jue... go... en... el... par... que', points: 60, pronunciationTip: 'La J suena como un suspiro fuerte desde la garganta.' },
+      { id: 'h-5', title: 'Cena Rica', word: 'Como mucha fruta', syllables: 'Co... mo... mu... cha... fru... ta', points: 70, pronunciationTip: 'Une todas las palabras suavemente como un caminito.' },
+      { id: 'h-6', title: 'Cielo Azul', word: 'El cielo es muy alto', syllables: 'El... cie... lo... es... muy... al... to', points: 75, pronunciationTip: 'Recuerda enfatizar la L al final de las palabras.' },
     ]
   }
 };

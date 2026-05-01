@@ -36,9 +36,10 @@ interface TherapistDashboardProps {
   user: Therapist | null;
   onBack: () => void;
   onStartChild: (child: Child) => void;
+  onEditChild: (child: Child) => void;
 }
 
-export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDashboardProps) {
+export function TherapistDashboard({ user, onBack, onStartChild, onEditChild }: TherapistDashboardProps) {
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -703,9 +704,18 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
                     </div>
                     <p className="text-slate-400 font-bold uppercase tracking-widest">Edad: {selectedChild.age} • Estilo: {selectedChild.learningStyle}</p>
                   </div>
-                  <button onClick={() => onStartChild(selectedChild)} className="bg-[#5D469E] text-white px-10 py-5 rounded-[2rem] font-black uppercase shadow-2xl shadow-purple-200 hover:bg-[#4a3683] transition-all hover:scale-105 active:scale-95">
-                    Iniciar Aventura
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => onEditChild(selectedChild)}
+                      className="p-5 bg-white border-4 border-slate-50 text-slate-400 hover:text-slate-600 rounded-[2rem] transition-all hover:scale-105"
+                      title="Administrar Perfil"
+                    >
+                      <Settings className="w-6 h-6" />
+                    </button>
+                    <button onClick={() => onStartChild(selectedChild)} className="bg-[#5D469E] text-white px-10 py-5 rounded-[2rem] font-black uppercase shadow-2xl shadow-purple-200 hover:bg-[#4a3683] transition-all hover:scale-105 active:scale-95">
+                      Iniciar Aventura
+                    </button>
+                  </div>
                </div>
 
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

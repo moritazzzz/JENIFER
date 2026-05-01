@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { type Child, type Session, type Difficulty, type ChatMessage } from '../../types';
 import { WORLDS } from '../../constants';
-import { Mic, MicOff, Star, Trophy, X, Check, Volume2, Timer, Info, ArrowLeft } from 'lucide-react';
+import { Mic, MicOff, Star, Trophy, X, Check, Volume2, Timer, Info, ArrowLeft, Sparkles, Loader2 } from 'lucide-react';
 import { Assistant } from '../chatbot/Assistant';
 import { db, auth } from '../../services/firebase';
 import { collection, addDoc, updateDoc, doc, increment } from 'firebase/firestore';
 import { cn } from '../../lib/utils';
 import confetti from 'canvas-confetti';
+import { generateSessionActivities, type GeneratedActivity } from '../../services/geminiService';
 
 interface ActivityProps {
   child: Child;
@@ -24,17 +25,49 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
   const [isListening, setIsListening] = useState(false);
   const [transcription, setTranscription] = useState('');
   const [feedback, setFeedback] = useState<'success' | 'retry' | null>(null);
+  const [sessionActivities, setSessionActivities] = useState<GeneratedActivity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [points, setPoints] = useState(0);
   const [stars, setStars] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(child.sessionDuration * 60);
   const [isFinished, setIsFinished] = useState(false);
   const [sessionChat, setSessionChat] = useState<ChatMessage[]>([]);
+  const initializedRef = useRef(false);
 
   const activeDifficulty = difficulty || child.difficulty;
   const world = WORLDS[activeDifficulty];
-  const activities = world.activities;
-  const currentActivity = activities[currentStep];
+  
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    async function initSession() {
+      setIsLoading(true);
+      try {
+        const aiActivities = await generateSessionActivities(activeDifficulty);
+        if (aiActivities && aiActivities.length > 0) {
+          setSessionActivities(aiActivities);
+        } else {
+          // Fallback to static pool
+          const pool = [...world.activities];
+          const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 5);
+          setSessionActivities(shuffled as any);
+        }
+      } catch (err) {
+        // Fallback to static pool
+        const pool = [...world.activities];
+        const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 5);
+        setSessionActivities(shuffled as any);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    initSession();
+  }, [activeDifficulty, world.activities]);
+
+  const currentActivity = sessionActivities[currentStep];
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -75,14 +108,16 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
 
   const simulateSpeech = () => {
     // For demo/unsupported browsers
+    if (!currentActivity) return;
     setTimeout(() => {
+      if (!currentActivity) return;
       const result = currentActivity.word;
       setTranscription(result);
       validateResult(result);
     }, 2000);
   };
   const speakActivity = () => {
-    if (!window.speechSynthesis) return;
+    if (!window.speechSynthesis || !currentActivity) return;
     window.speechSynthesis.cancel();
     
     const word = currentActivity.word;
@@ -111,14 +146,16 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
   };
 
   useEffect(() => {
+    if (!currentActivity) return;
     // Speak automatically on step change
     const timer = setTimeout(() => {
       speakActivity();
     }, 1000);
     return () => clearTimeout(timer);
-  }, [currentStep]);
+  }, [currentStep, currentActivity]);
 
   const validateResult = (text: string) => {
+    if (!currentActivity) return;
     const target = currentActivity.word.toLowerCase();
     const spoken = text.toLowerCase();
     
@@ -133,6 +170,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
   };
 
   const handleSuccess = () => {
+    if (!currentActivity) return;
     setFeedback('success');
     setPoints(prev => prev + currentActivity.points);
     setStars(prev => prev + 1);
@@ -153,7 +191,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
     setTimeout(() => {
       setFeedback(null);
       setTranscription('');
-      if (currentStep < activities.length - 1) {
+      if (currentStep < sessionActivities.length - 1) {
         setCurrentStep(prev => prev + 1);
       } else {
         finishSession();
@@ -162,6 +200,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
   };
 
   const handleRetry = () => {
+    if (!currentActivity) return;
     setFeedback('retry');
     
     if (window.speechSynthesis) {
@@ -190,7 +229,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
       childId: child.id,
       therapistId: child.therapistId,
       date: new Date().toISOString(),
-      levelReached: currentStep >= activities.length - 1 ? 'Completo' : `Paso ${currentStep + 1}`,
+      levelReached: currentStep >= sessionActivities.length - 1 ? 'Completo' : `Paso ${currentStep + 1}`,
       difficultyWorked: activeDifficulty,
       correctCount,
       incorrectCount: (currentStep + 1) - correctCount,
@@ -204,12 +243,22 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
     try {
       const sessionPath = `children/${child.id}/sessions`;
       
-      await addDoc(collection(db, sessionPath), session);
-      await updateDoc(doc(db, 'children', child.id), {
+      const updates: any = {
         points: increment(points),
         stars: increment(stars),
         lastSessionAt: new Date().toISOString()
-      });
+      };
+
+      // Progression Logic: Auto-advance difficulty
+      const newTotalPoints = (child.points || 0) + points;
+      if (activeDifficulty === 'easy' && newTotalPoints >= 100) {
+        updates.difficulty = 'medium';
+      } else if (activeDifficulty === 'medium' && newTotalPoints >= 300) {
+        updates.difficulty = 'hard';
+      }
+
+      await addDoc(collection(db, sessionPath), session);
+      await updateDoc(doc(db, 'children', child.id), updates);
       onFinish(session);
     } catch (error) {
       handleFirestoreError(error, 'write', `children/${child.id}/sessions and profile`);
@@ -238,6 +287,37 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
     const s = secs % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-full bg-blue-50 flex flex-col items-center justify-center p-10">
+        <motion.div 
+          animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+          transition={{ duration: 4, repeat: Infinity }}
+          className="bg-white p-12 rounded-[3rem] shadow-2xl flex flex-col items-center gap-8 border-b-8 border-gray-100"
+        >
+          <div className="relative">
+            <motion.div 
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              className="text-7xl text-blue-500"
+            >
+              <Loader2 className="w-20 h-20 animate-spin" />
+            </motion.div>
+            <Sparkles className="absolute -top-2 -right-2 w-8 h-8 text-yellow-400 animate-bounce" />
+          </div>
+          <div className="text-center">
+            <h2 className="text-3xl font-black text-gray-800 tracking-tight italic mb-2">
+              ¡Preparando tu aventura mágica!
+            </h2>
+            <p className="text-gray-500 font-bold uppercase tracking-widest text-sm">
+              La IA está buscando palabras nuevas para ti...
+            </p>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full bg-gray-50 flex flex-col p-6 md:p-10 relative overflow-y-auto custom-scrollbar">
@@ -269,10 +349,10 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
                 <div className="w-full md:w-32 h-3 bg-slate-200 rounded-full overflow-hidden">
                    <motion.div 
                       className="h-full bg-green-400" 
-                      animate={{ width: `${((currentStep + 1) / activities.length) * 100}%` }} 
+                      animate={{ width: `${((currentStep + 1) / (sessionActivities.length || 5)) * 100}%` }} 
                    />
                 </div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase shrink-0">{currentStep + 1}/{activities.length}</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase shrink-0">{currentStep + 1}/{sessionActivities.length}</span>
               </div>
             </div>
           </div>
@@ -299,6 +379,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
           </div>
 
           <div className="flex flex-col items-center max-w-2xl w-full">
+            {currentActivity && (
              <motion.div 
               key={currentStep}
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -310,7 +391,10 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
                   <div className="text-8xl mb-4">📢</div>
                   <h3 className="text-3xl font-bold text-gray-400">Escucha y repite:</h3>
                   <div className="flex items-center justify-center gap-4">
-                    <button className="bg-blue-100 p-4 rounded-2xl text-blue-600 hover:bg-blue-200 transition-all group">
+                    <button 
+                      onClick={() => speakActivity()}
+                      className="bg-blue-100 p-4 rounded-2xl text-blue-600 hover:bg-blue-200 transition-all group"
+                    >
                       <Volume2 className="w-10 h-10 group-hover:scale-110 transition-transform" />
                     </button>
                     <p className="text-7xl font-black text-blue-600 tracking-tight lowercase">"{currentActivity.word}"</p>
@@ -320,7 +404,12 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
 
               {activeDifficulty === 'medium' && (
                 <div className="text-center space-y-6">
-                  <div className="text-9xl mb-4">{(currentActivity as any).image}</div>
+                  <button 
+                    onClick={() => speakActivity()}
+                    className="text-9xl mb-4 hover:scale-110 transition-transform"
+                  >
+                    {(currentActivity as any).image}
+                  </button>
                   <h3 className="text-3xl font-bold text-gray-400 italic">¿Qué ves en la imagen?</h3>
                 </div>
               )}
@@ -330,7 +419,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
                    <div className="flex items-center justify-center gap-2 mb-6">
                       {currentActivity.word.split('').map((char, i) => (
                         <div key={i} className="w-14 h-14 bg-blue-50 border-2 border-blue-200 rounded-2xl flex items-center justify-center text-3xl font-black text-blue-600">
-                          _
+                          {char === ' ' ? ' ' : '_'}
                         </div>
                       ))}
                    </div>
@@ -340,7 +429,8 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
                    </div>
                 </div>
               )}
-           </motion.div>
+            </motion.div>
+            )}
 
            <div className="mt-12 flex flex-col items-center gap-4">
               <motion.button
