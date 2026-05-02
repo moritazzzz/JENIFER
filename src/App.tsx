@@ -17,7 +17,7 @@ import { auth, db } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
-type View = 'welcome' | 'therapist-dashboard' | 'child-selection' | 'child-setup' | 'child-edit' | 'world-map' | 'activity' | 'summary';
+type View = 'welcome' | 'therapist-dashboard' | 'child-selection' | 'child-setup' | 'world-map' | 'activity' | 'summary';
 
 export default function App() {
   const [view, setView] = useState<View>('welcome');
@@ -125,10 +125,6 @@ export default function App() {
             key="selection"
             onSelect={handleStartChildAdventure}
             onCreateNew={() => setView('child-setup')}
-            onEdit={(child) => {
-              setActiveChild(child);
-              setView('child-edit');
-            }}
             onBack={() => setView('welcome')}
           />
         )}
@@ -138,10 +134,6 @@ export default function App() {
             user={currentUser} 
             onBack={() => setView('welcome')} 
             onStartChild={handleStartChildAdventure}
-            onEditChild={(child) => {
-              setActiveChild(child);
-              setView('child-edit');
-            }}
           />
         )}
         {view === 'child-setup' && (
@@ -149,14 +141,6 @@ export default function App() {
             key="setup"
             onComplete={handleStartChildAdventure} 
             onBack={() => setView('child-selection')}
-          />
-        )}
-        {view === 'child-edit' && activeChild && (
-          <ChildSetup 
-            key="edit"
-            childToEdit={activeChild}
-            onComplete={handleStartChildAdventure} 
-            onBack={() => setView('world-map')}
           />
         )}
         {view === 'world-map' && activeChild && (
@@ -168,7 +152,6 @@ export default function App() {
               setView('activity');
             }}
             onBack={() => setView('welcome')}
-            onEditProfile={() => setView('child-edit')}
           />
         )}
         {view === 'activity' && activeChild && (

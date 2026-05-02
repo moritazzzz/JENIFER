@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, UserPlus, Star, Trophy, ChevronRight, Settings, Pencil } from 'lucide-react';
+import { ArrowLeft, UserPlus, Star, Trophy, ChevronRight } from 'lucide-react';
 import { db, auth } from '../../services/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { type Child } from '../../types';
@@ -9,14 +9,12 @@ import { cn } from '../../lib/utils';
 interface ChildSelectionProps {
   onSelect: (child: Child) => void;
   onCreateNew: () => void;
-  onEdit: (child: Child) => void;
   onBack: () => void;
 }
 
-export function ChildSelection({ onSelect, onCreateNew, onEdit, onBack }: ChildSelectionProps) {
+export function ChildSelection({ onSelect, onCreateNew, onBack }: ChildSelectionProps) {
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     fetchMyChildren();
@@ -61,16 +59,7 @@ export function ChildSelection({ onSelect, onCreateNew, onEdit, onBack }: ChildS
             ¿Quién va a jugar hoy?
           </h2>
           
-          <button 
-            onClick={() => setIsEditMode(!isEditMode)}
-            className={cn(
-              "p-4 rounded-2xl border-4 shadow-lg transition-all",
-              isEditMode ? "bg-blue-500 border-blue-200 text-white" : "bg-white/80 backdrop-blur-md border-white text-slate-600 hover:scale-105"
-            )}
-            title="Administrar Perfiles"
-          >
-            <Settings className="w-6 h-6" />
-          </button>
+          <div className="w-14" /> {/* Spacer for centering */}
         </div>
 
         {loading ? (
@@ -84,17 +73,9 @@ export function ChildSelection({ onSelect, onCreateNew, onEdit, onBack }: ChildS
                 key={child.id}
                 whileHover={{ y: -10, scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => isEditMode ? onEdit(child) : onSelect(child)}
-                className={cn(
-                  "bg-white/80 backdrop-blur-md border-8 rounded-[3rem] p-8 shadow-2xl group flex flex-col items-center text-center transition-all relative overflow-hidden",
-                  isEditMode ? "border-blue-400 ring-8 ring-blue-100" : "border-white"
-                )}
+                onClick={() => onSelect(child)}
+                className="bg-white/80 backdrop-blur-md border-8 border-white rounded-[3rem] p-8 shadow-2xl group flex flex-col items-center text-center transition-all"
               >
-                {isEditMode && (
-                  <div className="absolute top-6 right-6 bg-blue-500 text-white p-2 rounded-xl shadow-lg">
-                    <Pencil className="w-4 h-4" />
-                  </div>
-                )}
                 <div className="text-8xl mb-6 group-hover:animate-bounce transform transition-transform">
                   {child.avatar === 'lion' ? '🦁' : child.avatar === 'rabbit' ? '🐰' : child.avatar === 'panda' ? '🐼' : child.avatar === 'fox' ? '🦊' : child.avatar === 'owl' ? '🦉' : '🦄'}
                 </div>
@@ -120,7 +101,7 @@ export function ChildSelection({ onSelect, onCreateNew, onEdit, onBack }: ChildS
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nivel: {child.learningLevel}</p>
                 
                 <div className="mt-6 flex items-center justify-center gap-2 text-blue-600 font-black uppercase text-sm">
-                   {isEditMode ? 'ADMINISTRAR' : '¡ENTRAR!'} <ChevronRight className="w-4 h-4" />
+                   ¡ENTRAR! <ChevronRight className="w-4 h-4" />
                 </div>
               </motion.button>
             ))}

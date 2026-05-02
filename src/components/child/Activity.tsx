@@ -83,12 +83,23 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
     return () => clearInterval(timer);
   }, []);
 
+  const playSound = (type: 'success' | 'retry') => {
+    const urls = {
+      success: 'https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3',
+      retry: 'https://assets.mixkit.co/active_storage/sfx/3005/3005-preview.mp3'
+    };
+    const audio = new Audio(urls[type]);
+    audio.volume = 0.5;
+    audio.play().catch(e => console.log('Auto-play blocked or sound failed', e));
+  };
+
   const startListening = () => {
     if (!SpeechRecognition) {
-      alert("Lo siento, tu navegador no soporta reconocimiento de voz. ¡Usaremos el teclado por ahora!");
-      simulateSpeech();
+      alert("Lo siento, tu navegador no soporta reconocimiento de voz. Por favor usa Chrome o Edge.");
       return;
     }
+
+    if (isListening) return;
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'es-ES';
@@ -97,51 +108,46 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
 
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
+    recognition.onerror = (event: any) => {
+      console.log('Speech recognition error', event.error);
+      setIsListening(false);
+    };
     recognition.onresult = (event: any) => {
       const result = event.results[0][0].transcript;
       setTranscription(result);
       validateResult(result);
     };
 
-    recognition.start();
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error('Failed to start recognition', e);
+    }
   };
 
-  const simulateSpeech = () => {
-    // For demo/unsupported browsers
-    if (!currentActivity) return;
-    setTimeout(() => {
-      if (!currentActivity) return;
-      const result = currentActivity.word;
-      setTranscription(result);
-      validateResult(result);
-    }, 2000);
-  };
-  const speakActivity = () => {
+  const speakActivity = (autoListen: boolean = true) => {
     if (!window.speechSynthesis || !currentActivity) return;
     window.speechSynthesis.cancel();
     
-    const word = currentActivity.word;
-    const syllables = (currentActivity as any).syllables || word;
-    
-    let text = "";
-    if (activeDifficulty === 'easy') {
-      text = `Escucha con atención: ${syllables}. Ahora dilo conmigo: ${word}.`;
-    } else if (activeDifficulty === 'medium') {
-      text = `¿Qué vemos aquí? Es un... ${word}. Digámoslo por sílabas: ${syllables}.`;
-    } else {
-      text = `Dime esta frase completa: ${word}.`;
-    }
-
-    // Add pronunciation tip if available
-    const tip = (currentActivity as any).pronunciationTip;
-    if (tip) {
-      text += ` Un consejito mágico: ${tip}`;
-    }
+    const text = currentActivity.instruction || 
+      (activeDifficulty === 'easy' 
+        ? `Escucha y repite: ${currentActivity.word}` 
+        : `¿Qué es esto? Di su nombre en voz alta.`);
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'es-ES';
-    utterance.rate = 0.6; // Slower and clearer
+    utterance.rate = 0.9; 
     utterance.pitch = 1.1;
+    
+    utterance.onend = () => {
+      if (autoListen && !isFinished) {
+        // Short delay before listening to avoid picking up the synthesised voice
+        setTimeout(() => {
+          startListening();
+        }, 300);
+      }
+    };
+
     window.speechSynthesis.speak(utterance);
   };
 
@@ -153,6 +159,57 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
     }, 1000);
     return () => clearTimeout(timer);
   }, [currentStep, currentActivity]);
+
+  const validateOption = (selected: string) => {
+    if (!currentActivity) return;
+    if (selected.toLowerCase() === currentActivity.word.toLowerCase()) {
+      handleSuccess();
+    } else {
+      handleRetry();
+    }
+  };
+
+  const [completedWord, setCompletedWord] = useState<string[]>([]);
+  
+  useEffect(() => {
+    if (activeDifficulty === 'hard' && currentActivity) {
+      // Initialize completed word slots based on currentActivity.displayChallenge or word
+      const initial = currentActivity.displayChallenge 
+        ? currentActivity.displayChallenge.split('').map(c => c === '_' ? '' : c)
+        : currentActivity.word.split('').map(() => '');
+      setCompletedWord(initial);
+    }
+  }, [currentActivity, activeDifficulty]);
+
+  const addLetter = (letter: string) => {
+    // Speak the letter for phonetic reinforcement
+    if (window.speechSynthesis) {
+      const utterance = new SpeechSynthesisUtterance(letter);
+      utterance.lang = 'es-ES';
+      utterance.rate = 0.6; // Clear and slow
+      window.speechSynthesis.speak(utterance);
+    }
+
+    const nextIndex = completedWord.indexOf('');
+    if (nextIndex !== -1) {
+      const newWord = [...completedWord];
+      newWord[nextIndex] = letter;
+      setCompletedWord(newWord);
+      
+      if (newWord.join('').toLowerCase() === currentActivity.word.toLowerCase()) {
+        handleSuccess();
+      } else if (!newWord.includes('')) {
+        // If filled but wrong
+        handleRetry();
+        setTimeout(() => {
+          const reset = currentActivity.displayChallenge 
+            ? currentActivity.displayChallenge.split('').map(c => c === '_' ? '' : c)
+            : currentActivity.word.split('').map(() => '');
+          setCompletedWord(reset);
+        }, 2000);
+      }
+    }
+  };
 
   const validateResult = (text: string) => {
     if (!currentActivity) return;
@@ -176,17 +233,30 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
     setStars(prev => prev + 1);
     setCorrectCount(prev => prev + 1);
     
-    // Verbal praise
+    playSound('success');
+
+    // Verbal praise with motivational ending
     if (window.speechSynthesis) {
-      const phrases = ["¡Increíble!", "¡Lo lograste!", "¡Qué bien hablas!", "¡Súper!", "¡Eres un genio!"];
+      const phrases = [
+        "¡Excelente! Lo has dicho perfecto.",
+        "¡Muy bien! Esa es la palabra correcta.",
+        "¡Increíble! Tu pronunciación es genial.",
+        "¡Bravo! Vamos al siguiente desafío.",
+        "¡Estás mejorando muchísimo!"
+      ];
       const randomMsg = phrases[Math.floor(Math.random() * phrases.length)];
       const utterance = new SpeechSynthesisUtterance(randomMsg);
       utterance.lang = 'es-ES';
-      utterance.rate = 0.8;
+      utterance.rate = 0.9;
       window.speechSynthesis.speak(utterance);
     }
 
-    confetti({ particleCount: 40, spread: 50, colors: ['#4ade80', '#22c55e'] });
+    confetti({ 
+      particleCount: 100, 
+      spread: 70, 
+      origin: { y: 0.6 },
+      colors: ['#4ade80', '#22c55e', '#fbbf24'] 
+    });
 
     setTimeout(() => {
       setFeedback(null);
@@ -196,27 +266,37 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
       } else {
         finishSession();
       }
-    }, 2000);
+    }, 2500);
   };
 
   const handleRetry = () => {
     if (!currentActivity) return;
     setFeedback('retry');
+    playSound('retry');
     
     if (window.speechSynthesis) {
       const word = currentActivity.word;
-      const syllables = (currentActivity as any).syllables || word;
-      const tip = (currentActivity as any).pronunciationTip;
+      const tip = currentActivity.pronunciationTip;
       
-      const msg = `Casi lo tienes. Intentemos decir las sílabas: ${syllables}. Ahora todo junto: ${word}. ${tip || ""}`;
+      const phrases = [
+        `Casi, casi lo tienes. Intenta de nuevo. Recuerda que se dice: ${word}.`,
+        `Buen intento, pero escúchame bien: ${word}. ¿Puedes repetirlo?`,
+        `¡Oh! Estuvimos cerca. Prueba decir: ${word} otra vez.`
+      ];
+      const baseMsg = phrases[Math.floor(Math.random() * phrases.length)];
+      const msg = tip ? `${baseMsg} Un truquito: ${tip}` : baseMsg;
       
       const utterance = new SpeechSynthesisUtterance(msg);
       utterance.lang = 'es-ES';
-      utterance.rate = 0.6;
+      utterance.rate = 0.7;
       window.speechSynthesis.speak(utterance);
     }
 
-    setTimeout(() => setFeedback(null), 4000);
+    // Don't advance, wait for them to try again
+    setTimeout(() => {
+      setFeedback(null);
+      setTranscription('');
+    }, 4500);
   };
 
   const finishSession = async () => {
@@ -320,7 +400,10 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
   }
 
   return (
-    <div className="min-h-full bg-gray-50 flex flex-col p-6 md:p-10 relative overflow-y-auto custom-scrollbar">
+    <div className={cn(
+      "min-h-full bg-gray-50 flex flex-col p-6 md:p-10 relative overflow-y-auto custom-scrollbar transition-all duration-500",
+      isListening && "ring-[20px] ring-red-500/10 bg-red-50/30"
+    )}>
       <AnimatePresence>
         {feedback === 'success' && (
           <motion.div 
@@ -329,11 +412,31 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
             exit={{ opacity: 0, scale: 1.5 }}
             className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
           >
-            <div className="bg-green-500 text-white p-10 rounded-full shadow-2xl flex flex-col items-center">
-              <Check className="w-20 h-20" />
-              <span className="text-2xl font-black mt-2 tracking-tighter uppercase">¡EXCELENTE!</span>
+            <div className="bg-green-500 text-white p-12 rounded-[3rem] shadow-2xl flex flex-col items-center border-b-8 border-green-700">
+              <Check className="w-24 h-24 mb-4" />
+              <span className="text-4xl font-black tracking-tighter uppercase italic">¡LO LOGRASTE!</span>
+              <p className="text-green-100 font-bold mt-2">+ {currentActivity?.points} puntos</p>
             </div>
           </motion.div>
+        )}
+
+        {feedback === 'retry' && (
+           <motion.div 
+           initial={{ opacity: 0, y: 50 }} 
+           animate={{ opacity: 1, y: 0 }} 
+           exit={{ opacity: 0, y: 50 }}
+           className="fixed bottom-32 left-1/2 -translate-x-1/2 z-50 pointer-events-none w-full max-w-sm"
+         >
+           <div className="bg-orange-500 text-white px-8 py-6 rounded-[2rem] shadow-2xl flex items-center gap-4 border-b-8 border-orange-700">
+             <div className="bg-white/20 p-3 rounded-2xl">
+               <Volume2 className="w-8 h-8" />
+             </div>
+             <div>
+               <p className="font-black text-xl italic leading-tight uppercase">¡Casi! Intenta de nuevo</p>
+               <p className="text-orange-100 text-sm font-bold opacity-90">Respira y dilo otra vez</p>
+             </div>
+           </div>
+         </motion.div>
         )}
       </AnimatePresence>
 
@@ -381,51 +484,120 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
           <div className="flex flex-col items-center max-w-2xl w-full">
             {currentActivity && (
              <motion.div 
-              key={currentStep}
-              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              className="w-full bg-white rounded-[3rem] p-8 md:p-14 shadow-2xl shadow-blue-100 border-b-8 border-gray-100 flex flex-col items-center"
+               key={currentStep}
+               initial={{ opacity: 0, y: 10, scale: 0.95 }}
+               animate={{ opacity: 1, y: 0, scale: 1 }}
+               className="w-full bg-white rounded-[3rem] p-8 md:p-14 shadow-2xl shadow-blue-100 border-b-8 border-gray-100 flex flex-col items-center"
              >
-              {activeDifficulty === 'easy' && (
-                <div className="text-center space-y-6">
-                  <div className="text-8xl mb-4">📢</div>
-                  <h3 className="text-3xl font-bold text-gray-400">Escucha y repite:</h3>
-                  <div className="flex items-center justify-center gap-4">
-                    <button 
-                      onClick={() => speakActivity()}
-                      className="bg-blue-100 p-4 rounded-2xl text-blue-600 hover:bg-blue-200 transition-all group"
-                    >
-                      <Volume2 className="w-10 h-10 group-hover:scale-110 transition-transform" />
-                    </button>
-                    <p className="text-7xl font-black text-blue-600 tracking-tight lowercase">"{currentActivity.word}"</p>
+               {activeDifficulty === 'easy' && (
+                <div className="text-center space-y-8">
+                  <motion.div 
+                    animate={{ scale: [1, 1.05, 1], rotate: [0, 2, -2, 0] }} 
+                    transition={{ duration: 3, repeat: Infinity }}
+                    className="text-[10rem] leading-none mb-8 filter drop-shadow-2xl"
+                  >
+                    {currentActivity.image || "📢"}
+                  </motion.div>
+                  <div className="space-y-4">
+                    <h3 className="text-3xl font-black text-blue-400 uppercase tracking-tighter">Escucha y Repite</h3>
+                    <div className="flex items-center justify-center gap-6">
+                      <button 
+                        onClick={() => speakActivity()}
+                        className="bg-blue-100 p-6 rounded-[2rem] text-blue-600 hover:bg-blue-200 transition-all group shadow-inner"
+                      >
+                        <Volume2 className="w-14 h-14 group-hover:scale-110 transition-transform" />
+                      </button>
+                      <p className="text-8xl font-black text-blue-600 tracking-tighter lowercase">
+                        "{currentActivity.word}"
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
 
               {activeDifficulty === 'medium' && (
-                <div className="text-center space-y-6">
-                  <button 
-                    onClick={() => speakActivity()}
-                    className="text-9xl mb-4 hover:scale-110 transition-transform"
-                  >
-                    {(currentActivity as any).image}
-                  </button>
-                  <h3 className="text-3xl font-bold text-gray-400 italic">¿Qué ves en la imagen?</h3>
+                <div className="text-center space-y-10 w-full">
+                  <div className="space-y-4">
+                    <motion.div 
+                      key={currentActivity.image}
+                      initial={{ scale: 0.5, rotate: -10 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      className="text-[10rem] leading-none mb-4 filter drop-shadow-2xl"
+                    >
+                      {currentActivity.image}
+                    </motion.div>
+                    <h3 className="text-3xl font-black text-gray-800 tracking-tight italic">
+                      ¿Qué ves en la imagen?
+                    </h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                    {currentActivity.options?.map((opt, i) => (
+                      <motion.button
+                        key={i}
+                        whileHover={{ scale: 1.05, y: -5 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => validateOption(opt)}
+                        className="bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 p-6 rounded-[2rem] border-b-4 border-blue-200 font-black text-2xl transition-colors shadow-lg shadow-blue-100/50"
+                      >
+                        {opt}
+                      </motion.button>
+                    ))}
+                  </div>
+                  
+                  <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">
+                    O usa el micrófono para decirlo
+                  </p>
                 </div>
               )}
 
               {activeDifficulty === 'hard' && (
-                <div className="text-center space-y-6">
-                   <div className="flex items-center justify-center gap-2 mb-6">
-                      {currentActivity.word.split('').map((char, i) => (
-                        <div key={i} className="w-14 h-14 bg-blue-50 border-2 border-blue-200 rounded-2xl flex items-center justify-center text-3xl font-black text-blue-600">
-                          {char === ' ' ? ' ' : '_'}
+                <div className="text-center space-y-12 w-full">
+                   <div className="flex flex-col items-center gap-10">
+                      {currentActivity.image && (
+                        <motion.div 
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          className="text-9xl filter drop-shadow-xl mb-4"
+                        >
+                          {currentActivity.image}
+                        </motion.div>
+                      )}
+                      <div className="flex flex-wrap items-center justify-center gap-3">
+                        {completedWord.map((char, i) => (
+                          <motion.div 
+                            key={i} 
+                            animate={char ? { scale: [1, 1.2, 1] } : {}}
+                            className={cn(
+                              "w-14 h-16 rounded-2xl flex items-center justify-center text-4xl font-black transition-all",
+                              char 
+                                ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
+                                : "bg-white border-4 border-dashed border-gray-200 text-gray-200"
+                            )}
+                          >
+                            {char || '?'}
+                          </motion.div>
+                        ))}
+                      </div>
+                      
+                      <div className="space-y-6">
+                        <div className="flex flex-wrap justify-center gap-3">
+                          {currentActivity.word.split('').sort(() => Math.random() - 0.5).map((char, i) => (
+                            <motion.button
+                              key={i}
+                              whileHover={{ scale: 1.1, rotate: 5 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => addLetter(char)}
+                              className="w-14 h-14 bg-white border-2 border-gray-100 rounded-xl flex items-center justify-center text-2xl font-black text-gray-700 shadow hover:border-blue-400 hover:text-blue-600 transition-all uppercase"
+                            >
+                              {char}
+                            </motion.button>
+                          ))}
                         </div>
-                      ))}
-                   </div>
-                   <h3 className="text-3xl font-bold text-gray-400">¡Dilo en voz alta!</h3>
-                   <div className="text-sm bg-yellow-50 text-yellow-700 px-4 py-2 rounded-xl border border-yellow-100 flex items-center gap-2 font-medium">
-                      <Info className="w-4 h-4" /> Pista: Es un "{currentActivity.word}"
+                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+                          Pulsa las letras o di la palabra completa
+                        </p>
+                      </div>
                    </div>
                 </div>
               )}

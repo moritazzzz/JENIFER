@@ -11,12 +11,11 @@ import confetti from 'canvas-confetti';
 interface ChildSetupProps {
   onComplete: (child: Child) => void;
   onBack: () => void;
-  childToEdit?: Child;
 }
 
-export function ChildSetup({ onComplete, onBack, childToEdit }: ChildSetupProps) {
+export function ChildSetup({ onComplete, onBack }: ChildSetupProps) {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<Partial<Child>>(childToEdit || {
+  const [formData, setFormData] = useState<Partial<Child>>({
     name: '',
     age: 6,
     avatar: 'lion',
@@ -37,7 +36,7 @@ export function ChildSetup({ onComplete, onBack, childToEdit }: ChildSetupProps)
 
   const handleFinish = async () => {
     setIsSubmitting(true);
-    const id = childToEdit?.id || crypto.randomUUID();
+    const id = crypto.randomUUID();
     const therapistId = auth.currentUser?.uid || 'guest-therapist';
     const path = `children/${id}`;
     
@@ -286,7 +285,7 @@ export function ChildSetup({ onComplete, onBack, childToEdit }: ChildSetupProps)
                 disabled={isSubmitting}
                 className="bg-green-500 text-white px-12 py-4 rounded-2xl font-bold text-xl flex items-center gap-2 disabled:opacity-50"
               >
-                {isSubmitting ? (childToEdit ? "Guardando..." : "Creando...") : (childToEdit ? "Guardar Cambios" : "¡Empezar Aventura!")} <Star className="w-6 h-6 fill-current" />
+                {isSubmitting ? "Creando..." : "¡Empezar Aventura!"} <Star className="w-6 h-6 fill-current" />
               </motion.button>
             )}
           </div>
