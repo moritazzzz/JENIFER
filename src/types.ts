@@ -34,6 +34,7 @@ export interface Session {
   starsEarned: number;
   timeSpent: number; // in seconds
   chatHistory?: { role: 'user' | 'assistant'; content: string; timestamp: string }[];
+  practicedWords?: { word: string; success: boolean; attempts: number }[];
 }
 
 export interface Therapist {

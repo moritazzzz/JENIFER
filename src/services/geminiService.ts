@@ -20,25 +20,25 @@ export async function generateSessionActivities(difficulty: 'easy' | 'medium' | 
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   const difficultyDesc = {
-    easy: "Identificar y Pronunciar: El niño ve una imagen y repite lo que dice la IA.",
-    medium: "Seleccionar Imagen Correcta: El niño ve una imagen y elige la palabra correcta entre 3 opciones.",
-    hard: "Completar la Palabra: El niño debe completar una palabra a la que le faltan letras."
+    easy: "Nivel Inicial (4-5 años): Enfoque en vocales y palabras bisílabas simples (CV+CV) como 'mesa', 'pato', 'luna'. Repetición directa.",
+    medium: "Nivel Intermedio (5-6 años): Palabras de 2-3 sílabas con fonemas más variados. Identificación visual de objetos cotidianos.",
+    hard: "Nivel Avanzado (6-8 años): Palabras con fonemas complejos (RR, L, D al final) o grupos consonánticos (TR, PL, BR) como 'tren', 'plátano', 'perro', 'mariposa'. Enfoque en completar letras faltantes."
   };
 
-  const prompt = `Actúa como un logopeda experto para niños. 
-  Genera una lista de ${count} actividades de práctica para un niño en nivel ${difficulty}.
-  El nivel ${difficulty} consiste en: ${difficultyDesc[difficulty]}.
+  const prompt = `Actúa como un logopeda pediátrico experto. 
+  Genera ${count} actividades para un niño de 4 a 8 años con dificultades de habla, nivel: ${difficulty}.
+  ${difficultyDesc[difficulty]}.
 
-  REGLAS:
-  1. No repitas palabras comunes. Sé creativo.
-  2. Incluye SIEMPRE un emoji representativo en el campo 'image' para todos los niveles.
-  3. Para 'medium', incluye el campo 'options' con 3 palabras (la correcta y 2 distractores lógicos).
-  4. Para 'hard', incluye 'displayChallenge' con la palabra pero con 1 o 2 huecos usando guiones bajos (ejemplos: 'P_RR_O', 'C_S_').
-  5. 'instruction' es lo que dirás al niño:
-     - Easy: "¡Mira! Este es un [palabra]. ¿Puedes repetir conmigo?"
-     - Medium: "¡Mira este dibujo! ¿Qué es? Elige la palabra correcta."
-     - Hard: "¡Vamos a completar! ¿Qué palabra es esta? Elige las letras que faltan."
-  6. Devuelve EXCLUSIVAMENTE un arreglo JSON válido con estos campos: id, title, word, syllables, points, hint, pronunciationTip, instruction, image, options (solo medium), displayChallenge (solo hard).
+  REGLAS DE VOCABULARIO:
+  1. Usa palabras que un niño de esa edad conozca perfectamente.
+  2. Evita conceptos abstractos. Solo objetos, animales o acciones visibles.
+  3. Para 'hard', usa palabras que tengan sonidos que suelen costar (R, RR, grupos con L o R como 'globo' o 'fresa').
+  4. 'image' debe ser un emoji que el niño reconozca al instante. Incluye SIEMPRE un emoji en 'image' para todos los niveles.
+  5. 'syllables' debe estar dividido claramente: 'ma... ri... po... sa'.
+  6. 'instruction' debe ser muy dulce y motivadora. NUNCA incluyas guiones bajos (_) ni símbolos técnicos en este campo, ya que se leerán en voz alta. Si quieres referirte a una palabra incompleta, di simplemente "esta palabra" o su nombre real. EVITA mencionar personajes o a ti mismo.
+  7. Para 'medium', las 'options' deben ser palabras visualmente distintas.
+  
+  JSON SCHEMA: Devuelve un arreglo JSON con: id, title, word, syllables, points, hint, pronunciationTip, instruction, image, options (solo medium), displayChallenge (solo hard, ej: 'MA_IP_SA'). El campo displayChallenge SÍ puede tener guiones bajos.
 
   EJEMPLO JSON para Easy:
   [

@@ -48,6 +48,7 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
   const [viewingChat, setViewingChat] = useState<Session | null>(null);
   const [activeTab, setActiveTab] = useState('inicio');
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isReportOpen, setIsReportOpen] = useState(false);
   const [hasAttemptedAutoLogin, setHasAttemptedAutoLogin] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterLevel, setFilterLevel] = useState('all');
@@ -187,6 +188,54 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
     }
   };
 
+  const generateSummaryReport = () => {
+    if (!selectedChild || sessions.length === 0) return "No hay datos suficientes para generar un informe.";
+    
+    const totalPoints = selectedChild.points;
+    const totalStars = selectedChild.stars;
+    const lastSession = sessions[0]; // Assuming sorted by date descending, though I might need to sort it
+    const sortedSessions = [...sessions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const latest = sortedSessions[0];
+    
+    const wordsPool: {word: string, success: boolean, attempts: number}[] = [];
+    sessions.forEach(s => {
+      if (s.practicedWords) {
+        wordsPool.push(...s.practicedWords);
+      }
+    });
+
+    const uniqueWords = [...new Set(wordsPool.map(w => w.word))];
+    const difficultyStats = uniqueWords.map(word => {
+      const attempts = wordsPool.filter(w => w.word === word);
+      const totalAttempts = attempts.reduce((acc, curr) => acc + curr.attempts, 0);
+      const avgAttempts = (totalAttempts / attempts.length).toFixed(1);
+      return { word, avgAttempts };
+    });
+
+    return `
+📊 INFORME DE PROGRESO TERAPÉUTICO
+Niño/a: ${selectedChild.name}
+Fecha: ${new Date().toLocaleDateString()}
+
+PUNTUACIÓN GLOBAL:
+✨ Estrellas Ganadas: ${totalStars}
+🏆 Puntos Totales: ${totalPoints}
+🌍 Nivel Actual: ${selectedChild.difficulty.toUpperCase()}
+
+RESUMEN DE SESIONES:
+📅 Total sesiones registradas: ${sessions.length}
+✅ Último acierto: ${latest.correctCount}/${latest.totalWords} actividades.
+⏰ Tiempo total en última sesión: ${Math.floor(latest.timeSpent / 60)} min.
+
+VOCABULARIO DESTACADO:
+${difficultyStats.slice(0, 5).map(s => `- ${s.word}: ${s.avgAttempts} intentos de media.`).join('\n')}
+
+COMENTARIO DEL TERAPEUTA:
+El niño/a ha demostrado una gran evolución en el nivel ${selectedChild.difficulty}. 
+Su compromiso y alegría al interactuar con el asistente virtual están favoreciendo su fluidez verbal.
+    `;
+  };
+
   function handleFirestoreError(error: unknown, operationType: string, path: string | null) {
     const errInfo = {
       error: error instanceof Error ? error.message : String(error),
@@ -252,6 +301,13 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
       {/* Sidebar - Fixed Left */}
       <aside className="w-72 bg-[#5D469E] flex flex-col h-full shrink-0 shadow-2xl relative z-30">
         <div className="p-8">
+          <button 
+            onClick={onBack}
+            className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-[10px] font-black uppercase tracking-widest mb-6 group"
+          >
+            <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" />
+            Volver a Roles
+          </button>
           <div className="flex items-center gap-3 mb-4">
             <div className="bg-yellow-400 p-2 rounded-2xl text-white shadow-lg">
               <Star className="w-8 h-8 fill-current" />
@@ -273,7 +329,7 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
               key={item.id}
               onClick={() => {
                 setActiveTab(item.id);
-                if (item.id !== 'ninos') setSelectedChild(null);
+                setSelectedChild(null);
               }}
               className={cn(
                 "w-full flex items-center gap-4 p-4 rounded-2xl font-bold transition-all text-sm text-left group",
@@ -301,7 +357,7 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
 
       {/* Main Content Area */}
       <main className="flex-1 h-full overflow-y-auto relative bg-[#F7F9FF] custom-scrollbar">
-        <div className="max-w-[1440px] mx-auto p-10 space-y-10">
+        <div className="max-w-[1600px] mx-auto p-10 space-y-10">
           {activeTab === 'inicio' && !selectedChild && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               {/* Header */}
@@ -457,7 +513,7 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
                                <div className="text-center">
                                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 opacity-50">Actividades:</p>
                                   <p className="text-xs font-black text-slate-700"> {child.activities}</p>
-                               </div>
+                                </div>
                                <div className="w-14 h-14 rounded-full border-[6px] border-slate-50 shadow-inner flex items-center justify-center font-black text-emerald-500 text-xs relative">
                                   <svg className="absolute inset-0 w-full h-full -rotate-90">
                                     <circle 
@@ -487,7 +543,7 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
                           <BarChart3 className="w-5 h-5 text-emerald-400" />
                           <h3 className="text-xl font-black text-slate-800 tracking-tight">Progreso General</h3>
                         </div>
-                        <button className="text-slate-400 font-black text-[9px] bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 uppercase tracking-widest hover:bg-slate-100 transition-colors">Ver informe</button>
+                        <button onClick={() => setActiveTab('progreso')} className="text-slate-400 font-black text-[9px] bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 uppercase tracking-widest hover:bg-slate-100 transition-colors">Ver informe</button>
                       </div>
                       
                       <div className="h-64 flex items-end justify-around gap-6 px-4 pb-8 relative border-b-2 border-slate-50">
@@ -586,6 +642,172 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
             </motion.div>
           )}
 
+          {activeTab === 'vivo' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+              <h1 className="text-5xl font-black text-slate-800 mb-6 tracking-tight">Sesiones en Vivo</h1>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {children.slice(0, 3).map(child => (
+                  <div key={child.id} className="bg-white p-8 rounded-[3rem] shadow-xl border-4 border-emerald-100 relative group">
+                    <div className="absolute top-6 right-6">
+                      <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1 rounded-full">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                        <span className="text-[10px] font-black text-emerald-600 uppercase">Activo</span>
+                      </div>
+                    </div>
+                    <div className="text-6xl mb-6">{child.avatar === 'lion' ? '🦁' : '🐰'}</div>
+                    <h3 className="text-2xl font-black mb-2">{child.name}</h3>
+                    <p className="text-slate-400 text-sm font-bold mb-6">Mundo {child.difficulty.toUpperCase()}</p>
+                    <button 
+                      onClick={() => {
+                        setSelectedChild(child);
+                        fetchSessions(child.id);
+                      }}
+                      className="w-full bg-[#5D469E] text-white py-4 rounded-2xl font-black uppercase text-xs hover:bg-[#4a3683] transition-all"
+                    >
+                      Monitorear
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'informes' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+              <h1 className="text-5xl font-black text-slate-800 mb-6 tracking-tight">Centro de Informes</h1>
+              <div className="bg-white rounded-[3rem] shadow-xl overflow-hidden">
+                <div className="p-8 border-b-4 border-slate-50 flex justify-between items-center">
+                  <p className="font-black text-slate-400 uppercase text-xs tracking-widest">Informes Listos para Descargar</p>
+                </div>
+                <div className="p-8 space-y-4">
+                  {children.map(child => (
+                    <div key={child.id} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl group hover:bg-white hover:shadow-lg transition-all border border-transparent hover:border-slate-100">
+                      <div className="flex items-center gap-4">
+                        <div className="text-4xl">{child.avatar === 'lion' ? '🦁' : '🐰'}</div>
+                        <div>
+                          <p className="font-black text-slate-800">{child.name}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">Última actualización: Hoy</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setSelectedChild(child);
+                          fetchSessions(child.id).then(() => setIsReportOpen(true));
+                        }}
+                        className="bg-emerald-500 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-600 transition-all flex items-center gap-2"
+                      >
+                        <Download className="w-4 h-4" /> Generar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'progreso' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-12">
+              <h1 className="text-5xl font-black text-slate-800 tracking-tight">Progreso General</h1>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="bg-[#5D469E] p-10 rounded-[3rem] text-white shadow-2xl">
+                   <h3 className="text-2xl font-black italic mb-2">Tasa de Éxito</h3>
+                   <p className="text-white/60 font-bold mb-8 italic uppercase tracking-widest text-xs">Global de todos los alumnos</p>
+                   <div className="text-7xl font-black mb-4">78%</div>
+                   <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                     <div className="h-full bg-emerald-400 rounded-full" style={{ width: '78%' }} />
+                   </div>
+                </div>
+                <div className="col-span-2 bg-white p-10 rounded-[3rem] shadow-xl border border-slate-50">
+                   <h3 className="text-2xl font-black text-slate-800 mb-8">Evolución Semanal</h3>
+                   <div className="h-48 flex items-end justify-between gap-4">
+                      {[40, 65, 45, 90, 70, 85, 95].map((val, i) => (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-3">
+                          <div className={cn("w-full rounded-xl transition-all", i === 6 ? 'bg-emerald-400' : 'bg-slate-100')} style={{ height: `${val}%` }} />
+                          <span className="text-[10px] font-black text-slate-300 uppercase">Día {i+1}</span>
+                        </div>
+                      ))}
+                   </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'ia' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+              <h1 className="text-5xl font-black text-slate-800 mb-6 tracking-tight">Actividades IA</h1>
+              <div className="bg-white p-12 rounded-[4rem] text-center space-y-8 border-4 border-purple-50 shadow-2xl">
+                 <div className="text-8xl animate-pulse">✨🤖✨</div>
+                 <h2 className="text-4xl font-black text-slate-800 italic uppercase tracking-tighter">Entrenador de IA</h2>
+                 <p className="text-slate-500 font-medium text-xl max-w-2xl mx-auto">
+                    Nuestra Inteligencia Artificial está lista para crear actividades personalizadas basadas en el progreso de cada niño.
+                 </p>
+                 <div className="flex justify-center gap-4">
+                    <button className="bg-[#5D469E] text-white px-10 py-5 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl">
+                      Generar Pack Semanal
+                    </button>
+                    <button className="bg-white border-4 border-purple-100 text-purple-600 px-10 py-5 rounded-[2rem] font-black uppercase text-xs tracking-widest">
+                      Personalizar Vocabulario
+                    </button>
+                 </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'ajustes' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+              <h1 className="text-5xl font-black text-slate-800 mb-6 tracking-tight">Ajustes</h1>
+              <div className="bg-white p-10 rounded-[3rem] shadow-xl space-y-10">
+                <div className="flex items-center gap-6 pb-10 border-b-4 border-slate-50">
+                  <img 
+                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} 
+                    className="w-24 h-24 rounded-full border-4 border-slate-50"
+                  />
+                  <div>
+                    <h3 className="text-2xl font-black">{user.name}</h3>
+                    <p className="text-slate-400 font-bold">{user.email}</p>
+                    <button className="text-xs font-black text-purple-600 uppercase tracking-widest mt-2">Cambiar Foto</button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Idioma de la IA</p>
+                    <select className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-4 border-transparent focus:border-purple-200">
+                      <option>Español (España)</option>
+                      <option>Español (Latam)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-4">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Notificaciones</p>
+                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                      <span className="font-bold">Informes semanales</span>
+                      <div className="w-12 h-6 bg-emerald-400 rounded-full relative">
+                        <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'ayuda' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+              <h1 className="text-5xl font-black text-slate-800 mb-6 tracking-tight">Centro de Ayuda</h1>
+              <div className="space-y-4">
+                {[
+                  { q: "¿Cómo agrego a un nuevo niño?", a: "Ve a la pestaña 'Mis Niños' y pulsa el botón 'Registrar'." },
+                  { q: "¿Cómo funcionan los niveles de dificultad?", a: "La IA adapta las palabras y retos según el nivel seleccionado (Fácil, Medio o Difícil)." },
+                  { q: "¿Los padres pueden ver los informes?", a: "Sí, puedes descargar el informe en PDF o copiar el resumen para enviárselo por el medio que prefieras." }
+                ].map((faq, i) => (
+                  <div key={i} className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 text-left">
+                    <h4 className="text-lg font-black text-slate-800 mb-2">{faq.q}</h4>
+                    <p className="text-slate-500 font-medium">{faq.a}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
           {/* Niños list if Tab is 'ninos' and no child selected */}
           {activeTab === 'ninos' && !selectedChild && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -635,7 +857,7 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
                 </div>
               </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8">
                 {children
                   .filter(child => {
                     const matchesSearch = child.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -692,8 +914,15 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
           {selectedChild && (
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
                <div className="bg-white p-10 rounded-[3rem] shadow-xl border-4 border-white flex flex-col md:flex-row items-center gap-10">
-                  <button onClick={() => setSelectedChild(null)} className="p-4 bg-slate-50 hover:bg-slate-100 rounded-2xl transition-all">
-                    <ArrowLeft className="w-6 h-6" />
+                  <button 
+                    onClick={() => {
+                      setSelectedChild(null);
+                      setSessions([]);
+                    }} 
+                    className="flex items-center gap-2 p-4 bg-slate-50 hover:bg-slate-100 rounded-2xl transition-all group font-black uppercase text-[10px] tracking-widest text-slate-400 hover:text-[#5D469E]"
+                  >
+                    <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                    Volver
                   </button>
                   <div className="text-8xl">{selectedChild.avatar === 'lion' ? '🦁' : selectedChild.avatar === 'rabbit' ? '🐰' : selectedChild.avatar === 'panda' ? '🐼' : selectedChild.avatar === 'fox' ? '🦊' : selectedChild.avatar === 'owl' ? '🦉' : '🦄'}</div>
                   <div className="flex-1 text-center md:text-left">
@@ -705,6 +934,12 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
                   </div>
                   <button onClick={() => onStartChild(selectedChild)} className="bg-[#5D469E] text-white px-10 py-5 rounded-[2rem] font-black uppercase shadow-2xl shadow-purple-200 hover:bg-[#4a3683] transition-all hover:scale-105 active:scale-95">
                     Iniciar Aventura
+                  </button>
+                  <button 
+                    onClick={() => setIsReportOpen(true)}
+                    className="p-5 bg-white border-4 border-slate-50 text-slate-400 hover:text-purple-600 rounded-[2rem] shadow-xl transition-all hover:bg-purple-50 group"
+                  >
+                    <FileText className="w-8 h-8 group-hover:scale-110 transition-transform" />
                   </button>
                </div>
 
@@ -824,6 +1059,70 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
           )}
         </div>
       </main>
+
+      {/* Report Modal */}
+      {isReportOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-6 text-left">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border-8 border-white"
+          >
+            <div className="p-8 border-b-4 border-slate-50 flex justify-between items-center bg-[#10B981] text-white">
+              <div className="flex items-center gap-4">
+                 <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
+                    <FileText className="w-6 h-6" />
+                 </div>
+                 <div>
+                    <h3 className="font-black text-2xl uppercase tracking-tighter italic">Informe para Padres</h3>
+                    <p className="text-[10px] font-black opacity-80 uppercase tracking-widest mt-1">Generado por IA Mundos Mágicos</p>
+                 </div>
+              </div>
+              <button onClick={() => setIsReportOpen(false)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-all">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-10 bg-slate-50/50">
+              <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 font-mono text-sm text-slate-700 whitespace-pre-wrap leading-relaxed ring-8 ring-slate-50">
+                {generateSummaryReport()}
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mt-8">
+                 <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col items-center">
+                    <span className="text-2xl mb-1">📈</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase">Progreso</span>
+                    <span className="text-lg font-black text-emerald-500">+{selectedChild?.points} PTS</span>
+                 </div>
+                 <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col items-center">
+                    <span className="text-2xl mb-1">⭐</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase">Premios</span>
+                    <span className="text-lg font-black text-yellow-500">{selectedChild?.stars} Estrellas</span>
+                 </div>
+              </div>
+            </div>
+            
+            <div className="p-8 bg-white border-t-4 border-slate-50 grid grid-cols-2 gap-4">
+               <button 
+                onClick={() => {
+                  const text = generateSummaryReport();
+                  navigator.clipboard.writeText(text);
+                  alert("Informe copiado al portapapeles");
+                }} 
+                className="bg-[#5D469E] text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-2"
+               >
+                <Download className="w-4 h-4" /> Copiar Informe
+               </button>
+               <button 
+                onClick={() => setIsReportOpen(false)} 
+                className="bg-slate-100 text-slate-500 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all"
+               >
+                Cerrar
+               </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Chat Viewer Modal */}
       {viewingChat && (

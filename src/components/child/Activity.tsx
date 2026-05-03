@@ -33,6 +33,8 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
   const [timeRemaining, setTimeRemaining] = useState(child.sessionDuration * 60);
   const [isFinished, setIsFinished] = useState(false);
   const [sessionChat, setSessionChat] = useState<ChatMessage[]>([]);
+  const [practicedWordsRef, setPracticedWordsRef] = useState<{ word: string; success: boolean; attempts: number }[]>([]);
+  const [currentAttempts, setCurrentAttempts] = useState(0);
   const initializedRef = useRef(false);
 
   const activeDifficulty = difficulty || child.difficulty;
@@ -134,7 +136,9 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
         ? `Escucha y repite: ${currentActivity.word}` 
         : `¿Qué es esto? Di su nombre en voz alta.`);
 
-    const utterance = new SpeechSynthesisUtterance(text);
+    const speechText = text.replace(/_/g, ' '); // Replace underscores with spaces for natural pause or silence
+
+    const utterance = new SpeechSynthesisUtterance(speechText);
     utterance.lang = 'es-ES';
     utterance.rate = 0.9; 
     utterance.pitch = 1.1;
@@ -162,9 +166,14 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
 
   const validateOption = (selected: string) => {
     if (!currentActivity) return;
-    if (selected.toLowerCase() === currentActivity.word.toLowerCase()) {
+    const isCorrect = selected.toLowerCase() === currentActivity.word.toLowerCase();
+    
+    if (isCorrect) {
+      setPracticedWordsRef(prev => [...prev, { word: currentActivity.word, success: true, attempts: currentAttempts + 1 }]);
+      setCurrentAttempts(0);
       handleSuccess();
     } else {
+      setCurrentAttempts(prev => prev + 1);
       handleRetry();
     }
   };
@@ -197,9 +206,12 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
       setCompletedWord(newWord);
       
       if (newWord.join('').toLowerCase() === currentActivity.word.toLowerCase()) {
+        setPracticedWordsRef(prev => [...prev, { word: currentActivity.word, success: true, attempts: currentAttempts + 1 }]);
+        setCurrentAttempts(0);
         handleSuccess();
       } else if (!newWord.includes('')) {
         // If filled but wrong
+        setCurrentAttempts(prev => prev + 1);
         handleRetry();
         setTimeout(() => {
           const reset = currentActivity.displayChallenge 
@@ -220,8 +232,11 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
     const isCorrect = spoken.includes(target) || target.split(' ').every(word => spoken.includes(word));
 
     if (isCorrect) {
+      setPracticedWordsRef(prev => [...prev, { word: target, success: true, attempts: currentAttempts + 1 }]);
+      setCurrentAttempts(0);
       handleSuccess();
     } else {
+      setCurrentAttempts(prev => prev + 1);
       handleRetry();
     }
   };
@@ -285,8 +300,9 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
       ];
       const baseMsg = phrases[Math.floor(Math.random() * phrases.length)];
       const msg = tip ? `${baseMsg} Un truquito: ${tip}` : baseMsg;
+      const speechMsg = msg.replace(/_/g, ' ');
       
-      const utterance = new SpeechSynthesisUtterance(msg);
+      const utterance = new SpeechSynthesisUtterance(speechMsg);
       utterance.lang = 'es-ES';
       utterance.rate = 0.7;
       window.speechSynthesis.speak(utterance);
@@ -317,7 +333,8 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
       pointsEarned: points,
       starsEarned: stars,
       timeSpent: (child.sessionDuration * 60) - timeRemaining,
-      chatHistory: sessionChat.map(m => ({ ...m, timestamp: new Date().toISOString() }))
+      chatHistory: sessionChat.map(m => ({ ...m, timestamp: new Date().toISOString() })),
+      practicedWords: practicedWordsRef
     };
 
     try {
@@ -440,7 +457,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
         )}
       </AnimatePresence>
 
-      <div className="max-w-[1200px] mx-auto w-full flex flex-col flex-1 gap-12 relative z-10">
+      <div className="max-w-7xl mx-auto w-full flex flex-col flex-1 gap-12 relative z-10">
         <header className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-4 bg-white/80 backdrop-blur-md px-6 py-3 rounded-full border-4 border-white shadow-xl w-full md:w-auto">
             <div className="w-14 h-14 bg-orange-400 rounded-full border-4 border-white shadow-inner flex items-center justify-center text-3xl">
@@ -481,13 +498,13 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
              <h2 className="text-4xl font-black text-gray-800 italic">{world.description}</h2>
           </div>
 
-          <div className="flex flex-col items-center max-w-2xl w-full">
+          <div className="flex flex-col items-center max-w-4xl w-full">
             {currentActivity && (
              <motion.div 
                key={currentStep}
                initial={{ opacity: 0, y: 10, scale: 0.95 }}
                animate={{ opacity: 1, y: 0, scale: 1 }}
-               className="w-full bg-white rounded-[3rem] p-8 md:p-14 shadow-2xl shadow-blue-100 border-b-8 border-gray-100 flex flex-col items-center"
+               className="w-full max-w-4xl bg-white rounded-[3rem] p-8 md:p-14 shadow-2xl shadow-blue-100 border-b-8 border-gray-100 flex flex-col items-center"
              >
                {activeDifficulty === 'easy' && (
                 <div className="text-center space-y-8">

@@ -5,6 +5,8 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Maximize, Minimize } from 'lucide-react';
+import { cn } from './lib/utils';
 import { Welcome } from './components/Welcome';
 import { TherapistDashboard } from './components/therapist/Dashboard';
 import { ChildSetup } from './components/child/ChildSetup';
@@ -26,6 +28,29 @@ export default function App() {
   const [lastSession, setLastSession] = useState<Session | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((e) => {
+        console.error(`Error attempting to enable fullscreen: ${e.message}`);
+      });
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
@@ -110,8 +135,23 @@ export default function App() {
   }
 
   return (
-    <div className="bg-slate-200 min-h-screen flex items-center justify-center p-0 md:p-4">
-      <div className="app-container relative overflow-hidden">
+    <div className={cn(
+      "bg-slate-200 min-h-screen flex items-center justify-center transition-all duration-500",
+      isFullscreen ? "p-0" : "p-0 md:p-4"
+    )}>
+      <div className={cn(
+        "app-container relative overflow-hidden group/app",
+        isFullscreen && "is-fullscreen"
+      )}>
+        {/* Fullscreen Toggle Button */}
+        <button 
+          onClick={toggleFullscreen}
+          className="absolute top-4 right-4 z-[200] p-3 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-2xl text-white shadow-lg transition-all opacity-0 group-hover/app:opacity-100 hover:scale-110 active:scale-95"
+          title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+        >
+          {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+        </button>
+
         <AnimatePresence mode="wait">
         {view === 'welcome' && (
           <Welcome 

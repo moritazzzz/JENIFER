@@ -1,4 +1,5 @@
-import { motion } from 'motion/react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { type Child, type Difficulty } from '../../types';
 import { WORLDS } from '../../constants';
 import { Sparkles, Trophy, Star, Settings, ArrowLeft, Mic, Image as ImageIcon, Eye, LayoutGrid, ArrowRight, Clock, Award, MessageCircle } from 'lucide-react';
@@ -12,8 +13,113 @@ interface WorldMapProps {
 }
 
 export function WorldMap({ child, onSelectActivity, onBack }: WorldMapProps) {
+  const [isDailyModalOpen, setIsDailyModalOpen] = useState(false);
+  const [selectedAchievement, setSelectedAchievement] = useState<{title: string, desc: string, icon: string, color: string} | null>(null);
+  const dailyWord = "Estrella";
+
+  const achievements = [
+    { title: "Explorador", desc: "¡Has explorado todos los mundos mágicos!", icon: "🚀", color: "from-purple-400 to-purple-600" },
+    { title: "Buen oyente", desc: "¡Escuchas con mucha atención cada palabra!", icon: "💬", color: "from-blue-400 to-blue-600" },
+    { title: "Super estrella", desc: "¡Eres un experto pronunciando palabras difíciles!", icon: "⭐", color: "from-green-400 to-emerald-600" }
+  ];
+
   return (
     <div className="min-h-full bg-[#F7FBFE] flex flex-col relative overflow-y-auto overflow-x-hidden font-sans selection:bg-purple-100 custom-scrollbar">
+      <AnimatePresence>
+        {isDailyModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6 text-left">
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0, y: 50 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0, y: 50 }}
+              className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-8 border-white"
+            >
+              <div className="bg-gradient-to-br from-amber-400 to-amber-600 p-10 text-white text-center relative">
+                <div className="absolute top-4 left-4">
+                  <Star className="w-8 h-8 opacity-40" />
+                </div>
+                <div className="absolute bottom-4 right-4 text-white/20">
+                  <Trophy className="w-12 h-12 rotate-12" />
+                </div>
+                <motion.div 
+                  animate={{ scale: [1, 1.1, 1] }} 
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="inline-block bg-white/20 p-4 rounded-full mb-4"
+                >
+                  <Trophy className="w-16 h-16" />
+                </motion.div>
+                <h3 className="text-4xl font-black uppercase tracking-tighter italic">Desafío del Día</h3>
+                <p className="text-amber-100 font-bold mt-2">¡Gana el DOBLE de puntos hoy!</p>
+              </div>
+              
+              <div className="p-10 text-center space-y-6">
+                <div className="space-y-2">
+                  <p className="text-slate-400 font-black text-xs uppercase tracking-widest">Palabra Mágica:</p>
+                  <p className="text-5xl font-black text-slate-800 tracking-tighter">"{dailyWord}"</p>
+                </div>
+                
+                <p className="text-slate-500 font-medium text-lg leading-relaxed">
+                  Hoy practicaremos palabras que brillan. ¿Estás listo para convertirte en un experto?
+                </p>
+                
+                <div className="flex flex-col gap-3 pt-4">
+                  <button 
+                    onClick={() => {
+                      setIsDailyModalOpen(false);
+                      onSelectActivity('medium');
+                    }}
+                    className="bg-amber-500 text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-amber-200 hover:bg-amber-600 transition-all hover:scale-105 active:scale-95"
+                  >
+                    ¡Empezar Desafío!
+                  </button>
+                  <button 
+                    onClick={() => setIsDailyModalOpen(false)}
+                    className="text-slate-400 font-bold hover:text-slate-600 transition-colors py-2"
+                  >
+                    Quizás más tarde
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {selectedAchievement && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6 text-left">
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0, y: 50 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0, y: 50 }}
+              className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-8 border-white"
+            >
+              <div className={cn("bg-gradient-to-br p-12 text-white text-center relative", selectedAchievement.color)}>
+                <motion.div 
+                  initial={{ scale: 0, rotate: -20 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: "spring", damping: 12 }}
+                  className="text-8xl mb-6 inline-block filter drop-shadow-lg"
+                >
+                  {selectedAchievement.icon}
+                </motion.div>
+                <h3 className="text-4xl font-black uppercase tracking-tighter italic leading-none">{selectedAchievement.title}</h3>
+              </div>
+              
+              <div className="p-10 text-center space-y-8">
+                <p className="text-xl font-bold text-slate-600 leading-relaxed">
+                  {selectedAchievement.desc}
+                </p>
+                
+                <button 
+                  onClick={() => setSelectedAchievement(null)}
+                  className="w-full bg-slate-100 text-slate-500 py-5 rounded-[2rem] font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95"
+                >
+                  ¡Genial!
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       {/* Background Scenic Elements */}
       <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
         <div className="absolute top-20 left-[10%] w-32 h-16 bg-white rounded-full blur-2xl" />
@@ -211,7 +317,13 @@ export function WorldMap({ child, onSelectActivity, onBack }: WorldMapProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
-              onClick={() => item.id !== 'daily' && onSelectActivity(item.id as Difficulty)}
+              onClick={() => {
+                if (item.id === 'daily') {
+                  setIsDailyModalOpen(true);
+                } else {
+                  onSelectActivity(item.id as Difficulty);
+                }
+              }}
               className={cn(
                 "group relative overflow-hidden rounded-[3rem] border-4 p-8 transition-all cursor-pointer shadow-sm hover:shadow-2xl hover:-translate-y-2",
                 item.color, item.borderColor
@@ -256,15 +368,30 @@ export function WorldMap({ child, onSelectActivity, onBack }: WorldMapProps) {
               <p className="text-slate-400 font-black text-[10px] uppercase tracking-[0.2em] mb-4 text-center">Mis logros</p>
               <div className="flex justify-center gap-6">
                 <div className="flex flex-col items-center gap-1">
-                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-xl shadow-sm hover:scale-110 transition-transform cursor-pointer border-2 border-white ring-2 ring-purple-50">🚀</div>
+                  <div 
+                    onClick={() => setSelectedAchievement(achievements[0])}
+                    className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-xl shadow-sm hover:scale-110 transition-transform cursor-pointer border-2 border-white ring-2 ring-purple-50"
+                  >
+                    🚀
+                  </div>
                   <span className="text-[8px] font-black text-purple-400 uppercase">Explorador</span>
                 </div>
                 <div className="flex flex-col items-center gap-1">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-xl shadow-sm hover:scale-110 transition-transform cursor-pointer border-2 border-white ring-2 ring-blue-50">💬</div>
+                  <div 
+                    onClick={() => setSelectedAchievement(achievements[1])}
+                    className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-xl shadow-sm hover:scale-110 transition-transform cursor-pointer border-2 border-white ring-2 ring-blue-50"
+                  >
+                    💬
+                  </div>
                   <span className="text-[8px] font-black text-blue-400 uppercase">Buen oyente</span>
                 </div>
                 <div className="flex flex-col items-center gap-1">
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-xl shadow-sm hover:scale-110 transition-transform cursor-pointer border-2 border-white ring-2 ring-green-50">⭐</div>
+                  <div 
+                    onClick={() => setSelectedAchievement(achievements[2])}
+                    className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-xl shadow-sm hover:scale-110 transition-transform cursor-pointer border-2 border-white ring-2 ring-green-50"
+                  >
+                    ⭐
+                  </div>
                   <span className="text-[8px] font-black text-green-400 uppercase">Super estrella</span>
                 </div>
               </div>
