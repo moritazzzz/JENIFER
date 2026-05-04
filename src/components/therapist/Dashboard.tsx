@@ -148,6 +148,8 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
     }
   };
 
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
   const sidebarItems = [
     { id: 'inicio', label: 'Inicio', icon: Home },
     { id: 'ninos', label: 'Mis Niños', icon: Users },
@@ -346,7 +348,7 @@ Su compromiso y alegría al interactuar con el asistente virtual están favoreci
 
         <div className="p-4 mt-auto">
           <button 
-            onClick={() => signOut(auth)}
+            onClick={() => setShowLogoutConfirm(true)}
             className="w-full flex items-center gap-4 p-4 bg-white/10 hover:bg-white/20 rounded-[1.5rem] font-bold transition-all text-sm text-white group"
           >
             <LogOut className="w-5 h-5" />
@@ -354,6 +356,37 @@ Su compromiso y alegría al interactuar con el asistente virtual están favoreci
           </button>
         </div>
       </aside>
+
+      <AnimatePresence>
+        {showLogoutConfirm && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-6 bg-left">
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-sm w-full text-center border-8 border-white"
+            >
+              <div className="text-6xl mb-6">👋</div>
+              <h3 className="text-3xl font-black text-slate-800 mb-2 uppercase italic tracking-tighter">¿Ya te vas?</h3>
+              <p className="text-slate-500 font-medium mb-8">Asegúrate de haber guardado todos tus cambios antes de salir.</p>
+              <div className="space-y-3">
+                <button 
+                  onClick={() => signOut(auth)}
+                  className="w-full bg-red-500 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-red-600 transition-all"
+                >
+                  Sí, Cerrar Sesión
+                </button>
+                <button 
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="w-full bg-slate-100 text-slate-500 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Main Content Area */}
       <main className="flex-1 h-full overflow-y-auto relative bg-[#F7F9FF] custom-scrollbar">

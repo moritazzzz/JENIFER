@@ -16,8 +16,8 @@ import { Activity } from './components/child/Activity';
 import { SessionSummary } from './components/child/SessionSummary';
 import { type Child, type Therapist, type Session, type Difficulty } from './types';
 import { auth, db } from './services/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 type View = 'welcome' | 'therapist-dashboard' | 'child-selection' | 'child-setup' | 'world-map' | 'activity' | 'summary';
 
@@ -53,6 +53,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Safety timeout to ensure loading doesn't hang indefinitely
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
     let unsubscribeProfile: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
@@ -64,41 +69,28 @@ export default function App() {
       if (user) {
         // Use real-time listener for therapist profile
         const docRef = doc(db, 'therapists', user.uid);
-        import('firebase/firestore').then(({ onSnapshot }) => {
-          unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
-            if (docSnap.exists()) {
-              setCurrentUser(docSnap.data() as Therapist);
-            } else {
-              setCurrentUser(null);
-            }
-            setLoading(false);
-          }, (error) => {
-            console.error("Profile listen error:", error);
-            // Handle error anonymously
-            const errInfo = {
-              error: error.message,
-              operationType: 'get',
-              path: `therapists/${user.uid}`,
-              authInfo: { userId: user.uid, isAnonymous: user.isAnonymous }
-            };
-            console.error('Firestore Error Detailed: ', JSON.stringify(errInfo));
-            setLoading(false);
-          });
+        unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
+          if (docSnap.exists()) {
+            setCurrentUser(docSnap.data() as Therapist);
+          } else {
+            setCurrentUser(null);
+          }
+          setLoading(false);
+          clearTimeout(safetyTimeout);
+        }, (error) => {
+          console.error("Profile listen error:", error);
+          setLoading(false);
+          clearTimeout(safetyTimeout);
         });
       } else {
-        // Auto-login as guest for immediate access (only once per mount to avoid loops)
-        import('firebase/auth').then(({ signInAnonymously }) => {
-          signInAnonymously(auth).catch(err => {
-             console.error("Auto guest login failed:", err);
-             // We don't retry here to avoid hitting too-many-requests
-             if (err.code === 'auth/admin-restricted-operation') {
-               console.warn("⚠️ Anonymous Auth is disabled. Please enable 'Anonymous' provider in Firebase Console > Authentication > Sign-in method.");
-             } else if (err.code === 'auth/too-many-requests') {
-               console.error("Demasiadas solicitudes de inicio de sesión. Por favor, espere un momento y actualice la página.");
-             }
-             // If this fails, we still stop loading so the UI can show the login screen or error state
-             setLoading(false);
-          });
+        // Auto-login as guest for immediate access
+        signInAnonymously(auth).then(() => {
+          setLoading(false);
+          clearTimeout(safetyTimeout);
+        }).catch(err => {
+           console.error("Auto guest login failed:", err);
+           setLoading(false);
+           clearTimeout(safetyTimeout);
         });
         setCurrentUser(null);
       }
@@ -107,6 +99,7 @@ export default function App() {
     return () => {
       unsubscribeAuth();
       if (unsubscribeProfile) unsubscribeProfile();
+      clearTimeout(safetyTimeout);
     };
   }, []);
 
@@ -122,14 +115,24 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-blue-50">
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-blue-50 p-6 text-center">
         <motion.div
           animate={{ scale: [1, 1.2, 1], rotate: [0, 10, -10, 0] }}
           transition={{ repeat: Infinity, duration: 2 }}
-          className="text-6xl"
+          className="text-8xl mb-8"
         >
           ✨
         </motion.div>
+        <h2 className="text-3xl font-black text-blue-800 italic uppercase tracking-tighter mb-4">Cargando tu aventura...</h2>
+        <div className="w-48 h-2 bg-blue-100 rounded-full overflow-hidden mb-4">
+          <motion.div 
+            initial={{ x: '-100%' }}
+            animate={{ x: '100%' }}
+            transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+            className="w-full h-full bg-blue-500"
+          />
+        </div>
+        <p className="text-blue-400 font-bold text-sm uppercase tracking-widest animate-pulse">Iniciando mundos mágicos</p>
       </div>
     );
   }
