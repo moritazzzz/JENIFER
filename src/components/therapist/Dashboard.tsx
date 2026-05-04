@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   LogOut, 
   ArrowLeft, 
@@ -53,6 +53,88 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
   const [searchQuery, setSearchQuery] = useState('');
   const [filterLevel, setFilterLevel] = useState('all');
   const [filterDifficulty, setFilterDifficulty] = useState('all');
+  const [selectedChildIA, setSelectedChildIA] = useState<Child | null>(null);
+  const [iaAnalysis, setIaAnalysis] = useState<{
+    strengths: string[];
+    weaknesses: string[];
+    insights: string;
+    suggestions: { title: string; desc: string; type: string }[];
+  } | null>(null);
+
+  useEffect(() => {
+    if (selectedChildIA) {
+      analyzeProgress(selectedChildIA);
+    }
+  }, [selectedChildIA]);
+
+  const analyzeProgress = async (child: Child) => {
+    setLoading(true);
+    const path = `children/${child.id}/sessions`;
+    try {
+      const q = query(collection(db, path));
+      const snapshot = await getDocs(q);
+      const childSessions = snapshot.docs.map(doc => doc.data() as Session);
+
+      if (childSessions.length === 0) {
+        setIaAnalysis({
+          strengths: ['Entusiasmo inicial', 'Curiosidad'],
+          weaknesses: ['Sin datos previos'],
+          insights: `Inicia el proceso con ${child.name}. Se recomienda comenzar con actividades de reconocimiento visual básico.`,
+          suggestions: [
+            { title: 'Exploración de Vocabulario', desc: 'Identificar objetos simples de la casa.', type: 'Reconocimiento' },
+            { title: 'Sonidos Iniciales', desc: 'Asociar letras con sus sonidos correspondientes.', type: 'Fonología' }
+          ]
+        });
+        return;
+      }
+
+      // Real analysis logic
+      const wordsMap: Record<string, { totalAttempts: number; successCount: number }> = {};
+      childSessions.forEach(s => {
+        s.practicedWords?.forEach(pw => {
+          if (!wordsMap[pw.word]) wordsMap[pw.word] = { totalAttempts: 0, successCount: 0 };
+          wordsMap[pw.word].totalAttempts += pw.attempts;
+          if (pw.success) wordsMap[pw.word].successCount += 1;
+        });
+      });
+
+      const strengths = Object.entries(wordsMap)
+        .filter(([_, stats]) => stats.totalAttempts === stats.successCount)
+        .map(([word]) => word)
+        .slice(0, 3);
+
+      const weaknesses = Object.entries(wordsMap)
+        .filter(([_, stats]) => (stats.totalAttempts / stats.successCount) > 2)
+        .map(([word]) => word)
+        .slice(0, 3);
+
+      const insightText = weaknesses.length > 0
+        ? `${child.name} muestra cierta dificultad con las palabras "${weaknesses.join(', ')}". Su tasa de éxito general es de ${((strengths.length / (strengths.length + weaknesses.length)) * 100).toFixed(0)}%.`
+        : `${child.name} está progresando excelente en el nivel ${child.difficulty}. Ha dominado palabras clave como "${strengths.join(', ')}".`;
+
+      setIaAnalysis({
+        strengths: strengths.length > 0 ? strengths : ['Vocabulario base'],
+        weaknesses: weaknesses.length > 0 ? weaknesses : ['Nivel de frustración bajo'],
+        insights: insightText,
+        suggestions: [
+          { 
+            title: weaknesses.length > 0 ? 'Refuerzo de Fonemas' : 'Desafío de Velocidad', 
+            desc: weaknesses.length > 0 ? `Practicar específicamente los sonidos de ${weaknesses.join(', ')}.` : 'Intentar completar actividades en menos de 2 minutos.',
+            type: weaknesses.length > 0 ? 'Fonológico' : 'Cognitivo'
+          },
+          { 
+            title: 'Expansión de Categoría', 
+            desc: `Pasar de objetos simples a acciones relacionadas con ${child.learningLevel}.`, 
+            type: 'Semántico'
+          }
+        ]
+      });
+    } catch (error) {
+      console.error("AI Analysis error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!user && !loading && !hasAttemptedAutoLogin && !loginError) {
@@ -767,22 +849,167 @@ Su compromiso y alegría al interactuar con el asistente virtual están favoreci
 
           {activeTab === 'ia' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
-              <h1 className="text-5xl font-black text-slate-800 mb-6 tracking-tight">Actividades IA</h1>
-              <div className="bg-white p-12 rounded-[4rem] text-center space-y-8 border-4 border-purple-50 shadow-2xl">
-                 <div className="text-8xl animate-pulse">✨🤖✨</div>
-                 <h2 className="text-4xl font-black text-slate-800 italic uppercase tracking-tighter">Entrenador de IA</h2>
-                 <p className="text-slate-500 font-medium text-xl max-w-2xl mx-auto">
-                    Nuestra Inteligencia Artificial está lista para crear actividades personalizadas basadas en el progreso de cada niño.
-                 </p>
-                 <div className="flex justify-center gap-4">
-                    <button className="bg-[#5D469E] text-white px-10 py-5 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl">
-                      Generar Pack Semanal
-                    </button>
-                    <button className="bg-white border-4 border-purple-100 text-purple-600 px-10 py-5 rounded-[2rem] font-black uppercase text-xs tracking-widest">
-                      Personalizar Vocabulario
-                    </button>
-                 </div>
+              <div className="flex justify-between items-end mb-6">
+                <div>
+                  <h1 className="text-5xl font-black text-slate-800 mb-2 tracking-tight">Actividades IA</h1>
+                  <p className="text-slate-400 font-medium">Recomendaciones personalizadas basadas en el progreso real.</p>
+                </div>
+                {selectedChildIA && (
+                  <button 
+                    onClick={() => {
+                      setSelectedChildIA(null);
+                      setIaAnalysis(null);
+                    }}
+                    className="flex items-center gap-2 text-purple-600 font-black uppercase text-[10px] tracking-widest bg-purple-50 px-6 py-3 rounded-xl border border-purple-100 hover:bg-purple-100 transition-all"
+                  >
+                    <ArrowLeft className="w-4 h-4" /> Cambiar Niño
+                  </button>
+                )}
               </div>
+
+              {!selectedChildIA ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {children.map(child => (
+                    <motion.div 
+                      key={child.id}
+                      whileHover={{ scale: 1.02 }}
+                      onClick={() => setSelectedChildIA(child)}
+                      className="bg-white p-8 rounded-[3rem] shadow-xl border-4 border-slate-50 cursor-pointer group hover:border-purple-100 transition-all text-center"
+                    >
+                      <div className="text-7xl mb-6 transform group-hover:scale-110 transition-transform">
+                        {child.avatar === 'lion' ? '🦁' : child.avatar === 'rabbit' ? '🐰' : child.avatar === 'panda' ? '🐼' : child.avatar === 'fox' ? '🦊' : child.avatar === 'owl' ? '🦉' : '🦄'}
+                      </div>
+                      <h3 className="text-2xl font-black text-slate-800 mb-2">{child.name}</h3>
+                      <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mb-6">Nivel {child.difficulty.toUpperCase()}</p>
+                      <div className="bg-slate-50 py-3 rounded-2xl font-black text-slate-400 text-[10px] uppercase tracking-widest group-hover:bg-purple-600 group-hover:text-white transition-all">
+                        Analizar Progreso
+                      </div>
+                    </motion.div>
+                  ))}
+                  {children.length === 0 && (
+                    <div className="col-span-full bg-white p-20 rounded-[4rem] text-center border-4 border-dashed border-slate-100">
+                      <div className="text-6xl mb-6">🏜️</div>
+                      <h3 className="text-2xl font-black text-slate-400">No hay exploradores registrados aún.</h3>
+                      <button onClick={() => setActiveTab('ninos')} className="mt-6 text-[#5D469E] font-black uppercase text-xs hover:underline">Ir a registrar uno</button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-8 pb-20">
+                  {/* Child Summary Header */}
+                  <div className="bg-white p-10 rounded-[4rem] shadow-2xl border-4 border-white flex flex-col md:flex-row items-center gap-10 relative overflow-hidden">
+                    <div className="absolute top-0 right-10 -translate-y-1/2 w-40 h-40 bg-purple-50 rounded-full blur-3xl opacity-50" />
+                    <div className="text-8xl relative z-10">
+                      {selectedChildIA.avatar === 'lion' ? '🦁' : selectedChildIA.avatar === 'rabbit' ? '🐰' : selectedChildIA.avatar === 'panda' ? '🐼' : selectedChildIA.avatar === 'fox' ? '🦊' : selectedChildIA.avatar === 'owl' ? '🦉' : '🦄'}
+                    </div>
+                    <div className="flex-1 text-center md:text-left relative z-10">
+                      <h2 className="text-4xl font-black text-slate-800 mb-2">{selectedChildIA.name}</h2>
+                      <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                        <span className="px-4 py-1 bg-purple-50 text-purple-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-purple-100">
+                          {selectedChildIA.learningLevel}
+                        </span>
+                        <span className="px-4 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-100">
+                          {selectedChildIA.difficulty}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 relative z-10">
+                      <div className="bg-slate-50 p-4 rounded-3xl text-center min-w-[120px]">
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Estrellas</p>
+                        <p className="text-2xl font-black text-yellow-500">✨ {selectedChildIA.stars}</p>
+                      </div>
+                      <div className="bg-slate-50 p-4 rounded-3xl text-center min-w-[120px]">
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Puntos</p>
+                        <p className="text-2xl font-black text-blue-500">🏆 {selectedChildIA.points}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* AI Insights Card */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 bg-[#5D469E] p-12 rounded-[4rem] text-white shadow-2xl relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-110 transition-transform">
+                        <Wand2 className="w-40 h-40" />
+                      </div>
+                      <div className="relative z-10">
+                        <div className="flex items-center gap-3 mb-8">
+                          <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md">
+                            <Sparkles className="w-8 h-8 text-yellow-300" />
+                          </div>
+                          <h3 className="text-3xl font-black italic tracking-tighter uppercase">Análisis de IA</h3>
+                        </div>
+                        <p className="text-xl font-medium text-purple-50 leading-relaxed mb-10 italic">
+                          "{iaAnalysis?.insights || 'Cargando análisis...'}"
+                        </p>
+                        <div className="grid grid-cols-2 gap-6">
+                          <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/10">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-3 flex items-center gap-2">
+                              <Star className="w-3 h-3 fill-current" /> Fortalezas
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {iaAnalysis?.strengths.map(s => (
+                                <span key={s} className="bg-white/10 px-3 py-1 rounded-lg text-xs font-bold border border-white/5">{s}</span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/10">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-orange-400 mb-3 flex items-center gap-2">
+                              <ArrowLeft className="w-3 h-3 rotate-180" /> Áreas de mejora
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {iaAnalysis?.weaknesses.map(w => (
+                                <span key={w} className="bg-white/10 px-3 py-1 rounded-lg text-xs font-bold border border-white/5">{w}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-10 rounded-[4rem] shadow-xl border-4 border-slate-50">
+                      <h3 className="text-2xl font-black text-slate-800 mb-8 uppercase italic tracking-tighter flex items-center gap-3">
+                        <Award className="w-6 h-6 text-yellow-400" /> Siguiente Paso
+                      </h3>
+                      <div className="space-y-6">
+                        <p className="text-slate-500 font-medium text-sm">
+                          Basado en los datos, la IA sugiere ajustar el desafío para mantener el compromiso.
+                        </p>
+                        <div className="p-6 bg-slate-50 rounded-3xl border-2 border-slate-100">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ajuste recomendado</p>
+                          <p className="text-lg font-black text-slate-800">Dificultad: {selectedChildIA.difficulty === 'easy' ? 'Media' : selectedChildIA.difficulty === 'medium' ? 'Alta' : 'Mantener Alta'}</p>
+                        </div>
+                        <button className="w-full bg-[#5D469E] text-white py-5 rounded-[2.5rem] font-black uppercase text-xs tracking-widest shadow-xl hover:bg-[#4a3683] transition-all">
+                          Aplicar Ajustes
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Suggested Activities */}
+                  <div>
+                    <h3 className="text-3xl font-black text-slate-800 mb-8 uppercase italic tracking-tighter ml-6">Actividades Recomendadas</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {iaAnalysis?.suggestions.map((s, i) => (
+                        <div key={i} className="bg-white p-8 rounded-[3rem] shadow-xl border-4 border-slate-50 flex items-start gap-6 group hover:border-purple-100 transition-all">
+                          <div className={cn("p-5 rounded-3xl bg-slate-50 text-3xl group-hover:scale-110 transition-transform", i === 0 ? 'text-purple-500' : 'text-blue-500')}>
+                            {s.type === 'Fonológico' ? '🔊' : s.type === 'Semántico' ? '🍏' : '🧠'}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-center mb-2">
+                              <h4 className="text-xl font-black text-slate-800">{s.title}</h4>
+                              <span className="text-[10px] font-black uppercase tracking-widest text-[#5D469E] bg-purple-50 px-3 py-1 rounded-full">{s.type}</span>
+                            </div>
+                            <p className="text-slate-500 font-medium text-sm mb-4">{s.desc}</p>
+                            <button className="text-emerald-500 font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:gap-3 transition-all">
+                              Previsualizar Actividad <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 
