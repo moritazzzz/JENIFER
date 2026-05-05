@@ -30,6 +30,13 @@ export const WORLDS = {
       { id: 'v-6', title: 'Luna Llena', word: 'Luna', syllables: 'Lu... na', points: 15, hint: 'Sale de noche', pronunciationTip: 'Sube la puntita de la lengua al techo de la boca.' },
       { id: 'v-7', title: 'Sol Brillante', word: 'Sol', syllables: 'Sol', points: 15, hint: 'Sale de día', pronunciationTip: 'Sopla aire entre tus dientes suavemente.' },
       { id: 'v-8', title: 'Mesa Madera', word: 'Mesa', syllables: 'Me... sa', points: 15, hint: 'Donde comemos', pronunciationTip: 'Junta tus labios con fuerza y haz un sonido.' },
+      { id: 'v-9', title: 'Pato Loco', word: 'Pato', syllables: 'Pa... to', points: 15, hint: 'Hace cuac-cuac', pronunciationTip: 'Explota tus labios para la P y sopla para la T.' },
+      { id: 'v-10', title: 'Sapo Salta', word: 'Sapo', syllables: 'Sa... po', points: 15, hint: 'Salta en el agua', pronunciationTip: 'Sopla como una serpiente y luego explota los labios.' },
+      { id: 'v-11', title: 'Dedo Mágico', word: 'Dedo', syllables: 'De... do', points: 15, hint: 'Parte de la mano', pronunciationTip: 'Pon la lengua entre los dientes suavemente para la D.' },
+      { id: 'v-12', title: 'Nene Duerme', word: 'Nene', syllables: 'Ne... ne', points: 10, hint: 'Un bebé pequeñito', pronunciationTip: 'Sube la lengua al techo y haz un sonido nasal.' },
+      { id: 'v-13', title: 'Casa Linda', word: 'Casa', syllables: 'Ca... sa', points: 15, hint: 'Donde vivimos', pronunciationTip: 'Haz el sonido K desde atrás y sopla como serpiente.' },
+      { id: 'v-14', title: 'Bota Azul', word: 'Bota', syllables: 'Bo... ta', points: 15, hint: 'Para los pies', pronunciationTip: 'Junta los labios suave para la B.' },
+      { id: 'v-15', title: 'Rosa Roja', word: 'Rosa', syllables: 'Ro... sa', points: 25, hint: 'Una flor hermosa', pronunciationTip: 'Haz que tu lengua vibre un poquito para la R.' },
     ]
   },
   medium: {
@@ -46,6 +53,13 @@ export const WORLDS = {
       { id: 'm-6', title: 'Panda Comelón', image: '🐼', word: 'Panda', syllables: 'Pan... da', points: 35, pronunciationTip: 'Explota tus labios para la P.' },
       { id: 'm-7', title: 'Banano Dulce', image: '🍌', word: 'Banano', syllables: 'Ba... na... no', points: 35, pronunciationTip: 'Junta los labios suave para la B.' },
       { id: 'm-8', title: 'Gato Suave', image: '🐱', word: 'Gato', syllables: 'Ga... to', points: 35, pronunciationTip: 'Haz el sonido desde el fondo de tu garganta.' },
+      { id: 'm-9', title: 'Helado Frío', image: '🍦', word: 'Helado', syllables: 'He... la... do', points: 35, pronunciationTip: 'La H no suena, concéntrate en la L y la D.' },
+      { id: 'm-10', title: 'Pelota Redonda', image: '⚽', word: 'Pelota', syllables: 'Pe... lo... ta', points: 30, pronunciationTip: 'Explota la P y sube la lengua para la L.' },
+      { id: 'm-11', title: 'Conejo Saltón', image: '🐰', word: 'Conejo', syllables: 'Co... ne... jo', points: 40, pronunciationTip: 'La J suena como un suspiro fuerte.' },
+      { id: 'm-12', title: 'Guitarra Musical', image: '🎸', word: 'Guitarra', syllables: 'Gui... ta... rra', points: 45, pronunciationTip: 'La RR necesita que tu lengua vibre mucho.' },
+      { id: 'm-13', title: 'Tiburón Feroz', image: '🦈', word: 'Tiburón', syllables: 'Ti... bu... rón', points: 45, pronunciationTip: 'Sopla suave para la T y vibra para la R.' },
+      { id: 'm-14', title: 'Zapato Nuevo', image: '👟', word: 'Zapato', syllables: 'Za... pa... to', points: 35, pronunciationTip: 'Usa el sonido S para la Z.' },
+      { id: 'm-15', title: 'Queso Rico', image: '🧀', word: 'Queso', syllables: 'Que... so', points: 35, pronunciationTip: 'Haz el sonido K y luego el de la serpiente.' },
     ]
   },
   hard: {
@@ -60,6 +74,12 @@ export const WORLDS = {
       { id: 'h-4', title: 'Diversión', word: 'Juego en el parque', syllables: 'Jue... go... en... el... par... que', points: 60, pronunciationTip: 'La J suena como un suspiro fuerte desde la garganta.' },
       { id: 'h-5', title: 'Cena Rica', word: 'Como mucha fruta', syllables: 'Co... mo... mu... cha... fru... ta', points: 70, pronunciationTip: 'Une todas las palabras suavemente como un caminito.' },
       { id: 'h-6', title: 'Cielo Azul', word: 'El cielo es muy alto', syllables: 'El... cie... lo... es... muy... al... to', points: 75, pronunciationTip: 'Recuerda enfatizar la L al final de las palabras.' },
+      { id: 'h-7', title: 'Mi Familia', word: 'Amo a mi mamá', syllables: 'A... mo... a... mi... ma... má', points: 50, pronunciationTip: 'Pronuncia bien cada vocal.' },
+      { id: 'h-8', title: 'El Clima', word: 'Hoy hace mucho sol', syllables: 'Hoy... ha... ce... mu... cho... sol', points: 65, pronunciationTip: 'No te olvides de la L al final de sol.' },
+      { id: 'h-9', title: 'Transporte', word: 'El tren es muy largo', syllables: 'El... tren... es... muy... lar... go', points: 80, pronunciationTip: 'Práctica el sonido TR uniendo la lengua al techo.' },
+      { id: 'h-10', title: 'Naturaleza', word: 'Las flores son bellas', syllables: 'Las... flo... res... son... be... llas', points: 80, pronunciationTip: 'El sonido FL necesita un soplo suave.' },
+      { id: 'h-11', title: 'Animales', word: 'El gato toma leche', syllables: 'El... ga... to... to... ma... le... che', points: 70, pronunciationTip: 'La CH suena como un pequeño estornudo suave.' },
+      { id: 'h-12', title: 'Espacio', word: 'El cohete va al espacio', syllables: 'El... co... he... te... va... al... es... pa... cio', points: 90, pronunciationTip: 'Es una palabra larga, tómate tu tiempo.' },
     ]
   }
 };

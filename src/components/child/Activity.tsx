@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { type Child, type Session, type Difficulty, type ChatMessage } from '../../types';
+import { type Child, type Session, type Difficulty, type ChatMessage, type LiveCommand } from '../../types';
 import { WORLDS } from '../../constants';
-import { Mic, MicOff, Star, Trophy, X, Check, Volume2, Timer, Info, ArrowLeft, Sparkles, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Star, Trophy, X, Check, Volume2, Timer, Info, ArrowLeft, Sparkles, Loader2, RefreshCcw, SkipForward, ChevronRight } from 'lucide-react';
 import { Assistant } from '../chatbot/Assistant';
 import { db, auth } from '../../services/firebase';
-import { collection, addDoc, updateDoc, doc, increment } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, increment, onSnapshot, query, orderBy, limit, deleteDoc, getDocs } from 'firebase/firestore';
 import { cn } from '../../lib/utils';
 import confetti from 'canvas-confetti';
 import { generateSessionActivities, type GeneratedActivity } from '../../services/geminiService';
+import { MiniGame } from './MiniGame';
 
 interface ActivityProps {
   child: Child;
@@ -35,9 +36,15 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
   const [sessionChat, setSessionChat] = useState<ChatMessage[]>([]);
   const [practicedWordsRef, setPracticedWordsRef] = useState<{ word: string; success: boolean; attempts: number }[]>([]);
   const [currentAttempts, setCurrentAttempts] = useState(0);
+  const [showMiniGame, setShowMiniGame] = useState(false);
   const initializedRef = useRef(false);
 
   const activeDifficulty = difficulty || child.difficulty;
+  const difficultyNames = {
+    easy: 'Fácil',
+    medium: 'Medio',
+    hard: 'Difícil'
+  };
   const world = WORLDS[activeDifficulty];
   
   useEffect(() => {
@@ -47,19 +54,51 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
     async function initSession() {
       setIsLoading(true);
       try {
-        const aiActivities = await generateSessionActivities(activeDifficulty);
+        // Fetch used words from previous sessions for this child
+        const sessionsPath = `children/${child.id}/sessions`;
+        const q = query(collection(db, sessionsPath), orderBy('date', 'desc'), limit(5));
+        const snapshot = await getDocs(q);
+        const avoidWords: string[] = [];
+        snapshot.docs.forEach(doc => {
+          const data = doc.data() as Session;
+          if (data.practicedWords) {
+            data.practicedWords.forEach(pw => {
+               if (pw.success) avoidWords.push(pw.word.toLowerCase());
+            });
+          }
+        });
+
+        // Filter and unique avoid words
+        const uniqueAvoidWords = Array.from(new Set(avoidWords)).slice(0, 50);
+
+        let aiActivities = await generateSessionActivities(
+          activeDifficulty, 
+          child.learningLevel, 
+          child.age,
+          child.learningStyle,
+          uniqueAvoidWords
+        );
+        
+        // Safety check: Filter out any activity where the word is just the difficulty name
+        aiActivities = aiActivities.filter(a => 
+          a.word.toLowerCase() !== 'hard' && 
+          a.word.toLowerCase() !== 'medium' && 
+          a.word.toLowerCase() !== 'easy'
+        );
+
         if (aiActivities && aiActivities.length > 0) {
           setSessionActivities(aiActivities);
         } else {
           // Fallback to static pool
           const pool = [...world.activities];
-          const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 5);
+          const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 10);
           setSessionActivities(shuffled as any);
         }
       } catch (err) {
+        console.error("Error initializing session:", err);
         // Fallback to static pool
         const pool = [...world.activities];
-        const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 5);
+        const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 10);
         setSessionActivities(shuffled as any);
       } finally {
         setIsLoading(false);
@@ -172,6 +211,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
       setPracticedWordsRef(prev => [...prev, { word: currentActivity.word, success: true, attempts: currentAttempts + 1 }]);
       setCurrentAttempts(0);
       handleSuccess();
+      updateProfileRealtime(currentActivity.points, 1);
     } else {
       setCurrentAttempts(prev => prev + 1);
       handleRetry();
@@ -209,6 +249,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
         setPracticedWordsRef(prev => [...prev, { word: currentActivity.word, success: true, attempts: currentAttempts + 1 }]);
         setCurrentAttempts(0);
         handleSuccess();
+        updateProfileRealtime(currentActivity.points, 1);
       } else if (!newWord.includes('')) {
         // If filled but wrong
         setCurrentAttempts(prev => prev + 1);
@@ -235,6 +276,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
       setPracticedWordsRef(prev => [...prev, { word: target, success: true, attempts: currentAttempts + 1 }]);
       setCurrentAttempts(0);
       handleSuccess();
+      updateProfileRealtime(currentActivity.points, 1);
     } else {
       setCurrentAttempts(prev => prev + 1);
       handleRetry();
@@ -252,12 +294,14 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
 
     // Verbal praise with motivational ending
     if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
       const phrases = [
-        "¡Excelente! Lo has dicho perfecto.",
-        "¡Muy bien! Esa es la palabra correcta.",
-        "¡Increíble! Tu pronunciación es genial.",
-        "¡Bravo! Vamos al siguiente desafío.",
-        "¡Estás mejorando muchísimo!"
+        "¡Muy bien! Lo has dicho fantástico.",
+        "¡Increíble! Esa es la palabra correcta.",
+        "¡Qué bien lo haces! Vamos al siguiente.",
+        "¡Excelente! Estás aprendiendo muy rápido.",
+        "¡Bravo! Tu voz suena genial.",
+        "¡Fenomenal! Sigue así, explorador."
       ];
       const randomMsg = phrases[Math.floor(Math.random() * phrases.length)];
       const utterance = new SpeechSynthesisUtterance(randomMsg);
@@ -313,6 +357,118 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
       setFeedback(null);
       setTranscription('');
     }, 4500);
+  };
+
+  useEffect(() => {
+    if (!child.id) return;
+
+    const path = `children/${child.id}/liveCommands`;
+    const q = query(collection(db, path), orderBy('timestamp', 'asc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach(async (change) => {
+        if (change.type === 'added') {
+          const command = change.doc.data() as LiveCommand;
+          handleLiveCommand(command);
+          // Delete command after processing
+          try {
+            await deleteDoc(doc(db, path, change.doc.id));
+          } catch (e) {}
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [child.id]);
+
+  const handleLiveCommand = (command: LiveCommand) => {
+    switch (command.type) {
+      case 'message':
+        if (command.content && window.speechSynthesis) {
+          const utterance = new SpeechSynthesisUtterance(command.content);
+          utterance.lang = 'es-ES';
+          utterance.rate = 0.9;
+          window.speechSynthesis.speak(utterance);
+        }
+        break;
+      case 'confetti':
+        confetti({
+          particleCount: 150,
+          spread: 100,
+          origin: { y: 0.6 },
+          colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff']
+        });
+        break;
+      case 'sparkle':
+        setFeedback('success');
+        setTimeout(() => setFeedback(null), 3000);
+        break;
+    }
+  };
+
+  const updateProfileRealtime = async (pointsEarned: number, starsEarned: number) => {
+    try {
+      await updateDoc(doc(db, 'children', child.id), {
+        points: increment(pointsEarned),
+        stars: increment(starsEarned),
+        status: 'active',
+        lastActivity: currentActivity?.word || 'Iniciando',
+        progressPercent: Math.min(100, Math.floor(((currentStep + 1) / sessionActivities.length) * 100)),
+        lastUpdateAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.error("Error updating profile in real-time:", e);
+    }
+  };
+
+  useEffect(() => {
+    // Set status to active when monting
+    const setStatusActive = async () => {
+      try {
+        await updateDoc(doc(db, 'children', child.id), { status: 'active', lastUpdateAt: new Date().toISOString() });
+      } catch (e) {}
+    };
+    setStatusActive();
+
+    // Set status to idle when unmounting
+    return () => {
+      const setStatusIdle = async () => {
+        try {
+          await updateDoc(doc(db, 'children', child.id), { status: 'idle', lastUpdateAt: new Date().toISOString() });
+        } catch (e) {}
+      };
+      setStatusIdle();
+    };
+  }, [child.id]);
+
+  const skipActivity = () => {
+    if (currentStep < sessionActivities.length - 1) {
+      setCurrentStep(prev => prev + 1);
+      setTranscription('');
+      setFeedback(null);
+      setCurrentAttempts(0);
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      // Update real-time progress for therapist
+      const nextWord = sessionActivities[currentStep + 1]?.word || '...';
+      updateProfileRealtime(0, 0); // No points for skipping, but updates progress %
+    } else {
+      finishSession();
+    }
+  };
+
+  const resetCurrentActivity = () => {
+    setTranscription('');
+    setFeedback(null);
+    setCurrentAttempts(0);
+    if (activeDifficulty === 'hard' && currentActivity) {
+      const reset = currentActivity.displayChallenge 
+        ? currentActivity.displayChallenge.split('').map(c => c === '_' ? '' : c)
+        : currentActivity.word.split('').map(() => '');
+      setCompletedWord(reset);
+    }
+    // Stop any ongoing speech and restart instructions
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    speakActivity(false);
   };
 
   const finishSession = async () => {
@@ -387,17 +543,17 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
 
   if (isLoading) {
     return (
-      <div className="min-h-full bg-blue-50 flex flex-col items-center justify-center p-10">
+      <div className="min-h-full bg-primary-light flex flex-col items-center justify-center p-10">
         <motion.div 
           animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
           transition={{ duration: 4, repeat: Infinity }}
-          className="bg-white p-12 rounded-[3rem] shadow-2xl flex flex-col items-center gap-8 border-b-8 border-gray-100"
+          className="bg-white p-12 rounded-[3rem] shadow-2xl flex flex-col items-center gap-8 border-b-8 border-white"
         >
           <div className="relative">
             <motion.div 
               animate={{ rotate: 360 }}
               transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              className="text-7xl text-blue-500"
+              className="text-7xl text-primary"
             >
               <Loader2 className="w-20 h-20 animate-spin" />
             </motion.div>
@@ -460,15 +616,15 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
       <div className="max-w-7xl mx-auto w-full flex flex-col flex-1 gap-12 relative z-10">
         <header className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-4 bg-white/80 backdrop-blur-md px-6 py-3 rounded-full border-4 border-white shadow-xl w-full md:w-auto">
-            <div className="w-14 h-14 bg-orange-400 rounded-full border-4 border-white shadow-inner flex items-center justify-center text-3xl">
+            <div className="w-14 h-14 bg-primary/20 rounded-full border-4 border-white shadow-inner flex items-center justify-center text-3xl">
                {child.avatar === 'lion' ? '🦁' : child.avatar === 'rabbit' ? '🐰' : child.avatar === 'panda' ? '🐼' : child.avatar === 'fox' ? '🦊' : child.avatar === 'owl' ? '🦉' : '🦄'}
             </div>
             <div className="flex-1">
-              <h1 className="text-2xl font-black text-orange-600 tracking-tight leading-none uppercase">{child.name}</h1>
+              <h1 className="text-2xl font-black text-primary tracking-tight leading-none uppercase">{child.name}</h1>
               <div className="flex items-center gap-2 mt-1">
                 <div className="w-full md:w-32 h-3 bg-slate-200 rounded-full overflow-hidden">
                    <motion.div 
-                      className="h-full bg-green-400" 
+                      className="h-full bg-primary" 
                       animate={{ width: `${((currentStep + 1) / (sessionActivities.length || 5)) * 100}%` }} 
                    />
                 </div>
@@ -477,7 +633,34 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
             </div>
           </div>
 
-          <div className="flex gap-4 w-full md:w-auto justify-center">
+          <div className="flex flex-wrap gap-4 w-full md:w-auto justify-center">
+            <button 
+              onClick={() => setShowMiniGame(true)}
+              className="flex items-center gap-3 bg-white/80 backdrop-blur-md px-6 py-3 rounded-full border-4 border-white shadow-xl text-emerald-500 font-black hover:bg-emerald-50 transition-all hover:scale-105 active:scale-95 group"
+              title="Juego de bonus"
+            >
+              <Sparkles className="w-5 h-5 text-emerald-400 group-hover:scale-125 transition-transform" />
+              <span className="uppercase text-[10px] tracking-widest italic">Juego Bonus</span>
+            </button>
+
+            <button 
+              onClick={resetCurrentActivity}
+              className="flex items-center gap-3 bg-white/80 backdrop-blur-md px-6 py-3 rounded-full border-4 border-white shadow-xl text-primary font-black hover:bg-primary-light transition-all hover:scale-105 active:scale-95 group"
+              title="Reiniciar ejercicio actual"
+            >
+              <RefreshCcw className="w-5 h-5 text-primary/60 group-hover:rotate-180 transition-transform duration-500" />
+              <span className="uppercase text-[10px] tracking-widest italic">Reiniciar</span>
+            </button>
+
+            <button 
+              onClick={skipActivity}
+              className="flex items-center gap-3 bg-white/80 backdrop-blur-md px-6 py-3 rounded-full border-4 border-white shadow-xl text-orange-500 font-black hover:bg-orange-50 transition-all hover:scale-105 active:scale-95 group"
+              title="Pasar a la siguiente palabra"
+            >
+              <SkipForward className="w-5 h-5 text-orange-400 group-hover:translate-x-1 transition-transform" />
+              <span className="uppercase text-[10px] tracking-widest italic">Saltar</span>
+            </button>
+
             <div className="flex items-center gap-3 bg-white/80 backdrop-blur-md px-5 py-2 rounded-full border-4 border-white shadow-lg">
                <Timer className="w-5 h-5 text-red-500" />
                <span className="text-xl font-black text-slate-700">{formatTime(timeRemaining)}</span>
@@ -494,8 +677,9 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
 
         <main className="flex-1 flex flex-col items-center justify-center py-6">
           <div className="text-center mb-12">
-             <p className="text-sm font-bold text-blue-500 uppercase tracking-[0.2em] mb-2">{world.name}</p>
-             <h2 className="text-4xl font-black text-gray-800 italic">{world.description}</h2>
+             <p className="text-sm font-bold text-primary uppercase tracking-[0.2em] mb-2">Mundo {difficultyNames[activeDifficulty as keyof typeof difficultyNames]}</p>
+             <h2 className="text-4xl font-black text-gray-800 italic">{world.name}</h2>
+             <p className="text-gray-500 font-bold mt-1 uppercase tracking-widest text-[10px]">{world.description}</p>
           </div>
 
           <div className="flex flex-col items-center max-w-4xl w-full">
@@ -504,27 +688,32 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
                key={currentStep}
                initial={{ opacity: 0, y: 10, scale: 0.95 }}
                animate={{ opacity: 1, y: 0, scale: 1 }}
-               className="w-full max-w-4xl bg-white rounded-[3rem] p-8 md:p-14 shadow-2xl shadow-blue-100 border-b-8 border-gray-100 flex flex-col items-center"
+               className="w-full max-w-4xl bg-white rounded-[3rem] p-8 md:p-14 shadow-2xl shadow-primary/10 border-b-8 border-gray-100 flex flex-col items-center"
              >
                {activeDifficulty === 'easy' && (
                 <div className="text-center space-y-8">
                   <motion.div 
                     animate={{ scale: [1, 1.05, 1], rotate: [0, 2, -2, 0] }} 
                     transition={{ duration: 3, repeat: Infinity }}
-                    className="text-[10rem] leading-none mb-8 filter drop-shadow-2xl"
+                    className={cn(
+                      "leading-none mb-8 filter drop-shadow-2xl",
+                      child.learningStyle === 'visual' ? "text-[12rem]" : "text-[10rem]"
+                    )}
                   >
                     {currentActivity.image || "📢"}
                   </motion.div>
                   <div className="space-y-4">
-                    <h3 className="text-3xl font-black text-blue-400 uppercase tracking-tighter">Escucha y Repite</h3>
+                    <h3 className="text-3xl font-black text-primary/60 uppercase tracking-tighter">
+                      {child.learningStyle === 'auditivo' ? '¡Escucha con atención!' : 'Escucha y Repite'}
+                    </h3>
                     <div className="flex items-center justify-center gap-6">
                       <button 
                         onClick={() => speakActivity()}
-                        className="bg-blue-100 p-6 rounded-[2rem] text-blue-600 hover:bg-blue-200 transition-all group shadow-inner"
+                        className="bg-primary-light p-6 rounded-[2rem] text-primary hover:opacity-80 transition-all group shadow-inner"
                       >
                         <Volume2 className="w-14 h-14 group-hover:scale-110 transition-transform" />
                       </button>
-                      <p className="text-8xl font-black text-blue-600 tracking-tighter lowercase">
+                      <p className="text-8xl font-black text-primary tracking-tighter lowercase">
                         "{currentActivity.word}"
                       </p>
                     </div>
@@ -539,15 +728,25 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
                       key={currentActivity.image}
                       initial={{ scale: 0.5, rotate: -10 }}
                       animate={{ scale: 1, rotate: 0 }}
-                      className="text-[10rem] leading-none mb-4 filter drop-shadow-2xl"
+                      className={cn(
+                        "leading-none mb-4 filter drop-shadow-2xl",
+                        child.learningStyle === 'visual' ? "text-[12rem]" : "text-[10rem]"
+                      )}
                     >
                       {currentActivity.image}
                     </motion.div>
                     <h3 className="text-3xl font-black text-gray-800 tracking-tight italic">
-                      ¿Qué ves en la imagen?
+                      {child.learningStyle === 'escritura' ? '¿Cómo se escribe este objeto?' : '¿Qué ves en la imagen?'}
                     </h3>
                   </div>
                   
+                  {child.learningStyle === 'escritura' && (
+                    <div className="bg-primary/5 p-4 rounded-2xl border-2 border-dashed border-primary/20 flex flex-col items-center gap-2 mb-4">
+                       <p className="text-primary font-black uppercase text-xs tracking-widest leading-none">Pista de escritura:</p>
+                       <p className="text-2xl font-black text-primary tracking-[0.5em]">{currentActivity.word.split('').map((c, i) => i === 0 || i === currentActivity.word.length - 1 ? c : '_').join('')}</p>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
                     {currentActivity.options?.map((opt, i) => (
                       <motion.button
@@ -555,7 +754,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
                         whileHover={{ scale: 1.05, y: -5 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => validateOption(opt)}
-                        className="bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 p-6 rounded-[2rem] border-b-4 border-blue-200 font-black text-2xl transition-colors shadow-lg shadow-blue-100/50"
+                        className="bg-primary-light hover:bg-primary hover:text-white text-primary p-6 rounded-[2rem] border-b-4 border-primary/20 font-black text-2xl transition-colors shadow-lg shadow-primary/10"
                       >
                         {opt}
                       </motion.button>
@@ -583,29 +782,29 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
                       <div className="flex flex-wrap items-center justify-center gap-3">
                         {completedWord.map((char, i) => (
                           <motion.div 
-                            key={i} 
+                            key={`${currentActivity.word}-${i}`} 
                             animate={char ? { scale: [1, 1.2, 1] } : {}}
                             className={cn(
                               "w-14 h-16 rounded-2xl flex items-center justify-center text-4xl font-black transition-all",
                               char 
-                                ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
+                                ? "bg-primary text-white shadow-lg shadow-primary/20" 
                                 : "bg-white border-4 border-dashed border-gray-200 text-gray-200"
                             )}
                           >
-                            {char || '?'}
+                            {char || (currentActivity.word[i] === ' ' ? ' ' : '?')}
                           </motion.div>
                         ))}
                       </div>
                       
                       <div className="space-y-6">
                         <div className="flex flex-wrap justify-center gap-3">
-                          {currentActivity.word.split('').sort(() => Math.random() - 0.5).map((char, i) => (
+                          {currentActivity.word.replace(/\s/g, '').split('').sort(() => Math.random() - 0.5).map((char, i) => (
                             <motion.button
-                              key={i}
+                              key={`${currentActivity.word}-btn-${i}`}
                               whileHover={{ scale: 1.1, rotate: 5 }}
                               whileTap={{ scale: 0.9 }}
                               onClick={() => addLetter(char)}
-                              className="w-14 h-14 bg-white border-2 border-gray-100 rounded-xl flex items-center justify-center text-2xl font-black text-gray-700 shadow hover:border-blue-400 hover:text-blue-600 transition-all uppercase"
+                              className="w-14 h-14 bg-white border-2 border-gray-100 rounded-xl flex items-center justify-center text-2xl font-black text-gray-700 shadow hover:border-primary hover:text-primary transition-all uppercase"
                             >
                               {char}
                             </motion.button>
@@ -628,7 +827,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
                 onClick={startListening}
                 className={cn(
                   "p-10 rounded-full shadow-2xl transition-all relative overflow-hidden",
-                  isListening ? "bg-red-500 scale-110 ring-8 ring-red-100" : "bg-blue-600 hover:bg-blue-700 shadow-blue-200"
+                  isListening ? "bg-red-500 scale-110 ring-8 ring-red-100" : "bg-primary hover:bg-primary-dark shadow-primary/20"
                 )}
               >
                 {isListening ? <Mic className="w-12 h-12 text-white animate-pulse" /> : <Mic className="w-12 h-12 text-white" />}
@@ -690,6 +889,18 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
           className="absolute top-[40%] left-[40%] text-5xl opacity-30"
         >✨</motion.span>
       </div>
+      {showMiniGame && currentActivity && (
+        <MiniGame 
+          word={currentActivity.word}
+          image={currentActivity.image || '🎮'}
+          themeColor={child.themeColor}
+          onComplete={(bonusPoints) => {
+            setPoints(p => p + bonusPoints);
+            setShowMiniGame(false);
+          }}
+          onClose={() => setShowMiniGame(false)}
+        />
+      )}
     </div>
   );
 }

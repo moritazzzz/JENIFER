@@ -24,11 +24,12 @@ import {
   Search,
   MoreVertical,
   Wand2,
-  X
+  X,
+  Book
 } from 'lucide-react';
 import { auth, db } from '../../services/firebase';
 import { GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, addDoc, serverTimestamp, onSnapshot, orderBy, deleteDoc } from 'firebase/firestore';
 import { type Child, type Therapist, type Session, type LiveCommand } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -59,6 +60,7 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
     weaknesses: string[];
     insights: string;
     suggestions: { title: string; desc: string; type: string }[];
+    relatedWords?: { word: string; category: string; icon: string }[];
   } | null>(null);
 
   useEffect(() => {
@@ -75,14 +77,41 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
       const snapshot = await getDocs(q);
       const childSessions = snapshot.docs.map(doc => doc.data() as Session);
 
+      // Level descriptions for contexts
+      const levelDescriptions = {
+        'presilábico': 'Etapa donde el niño aún no comprende la relación letra-sonido. Se enfoca en la conciencia fonológica y distinción entre dibujo y escritura.',
+        'silábico': 'Etapa donde el niño asigna un valor sonoro a cada letra (generalmente una letra por sílaba).',
+        'alfabético': 'Etapa donde el niño ya comprende que cada letra corresponde a un sonido y viceversa.'
+      };
+
+      const styleAdvices = {
+        'visual': 'Utilizar tarjetas con imágenes grandes y colores contrastantes. Apoyo en pictogramas.',
+        'auditivo': 'Enfatizar la rima, aliteraciones y el uso de la voz del asistente para guiar.',
+        'escritura': 'Incorporar ejercicios de trazo en pantalla y formación de palabras con letras móviles.'
+      };
+
       if (childSessions.length === 0) {
         setIaAnalysis({
-          strengths: ['Entusiasmo inicial', 'Curiosidad'],
-          weaknesses: ['Sin datos previos'],
-          insights: `Inicia el proceso con ${child.name}. Se recomienda comenzar con actividades de reconocimiento visual básico.`,
+          strengths: ['Curiosidad activa', 'Disposición inicial'],
+          weaknesses: ['Sin bagaje de datos'],
+          insights: `Inicia el proceso con ${child.name}. Se encuentra en nivel ${child.learningLevel.toUpperCase()}. ${levelDescriptions[child.learningLevel]} Se recomienda un enfoque principalmente ${child.learningStyle} según su perfil.`,
           suggestions: [
-            { title: 'Exploración de Vocabulario', desc: 'Identificar objetos simples de la casa.', type: 'Reconocimiento' },
-            { title: 'Sonidos Iniciales', desc: 'Asociar letras con sus sonidos correspondientes.', type: 'Fonología' }
+            { 
+              title: `Enfoque ${child.learningStyle.charAt(0).toUpperCase() + child.learningStyle.slice(1)}`, 
+              desc: styleAdvices[child.learningStyle], 
+              type: 'Metodología' 
+            },
+            { 
+              title: 'Conciencia del Nivel', 
+              desc: child.learningLevel === 'presilábico' ? 'Jugar a contar sílabas con palmadas.' : 'Identificar la letra inicial de los objetos.', 
+              type: 'Ejercicio Base' 
+            }
+          ],
+          relatedWords: [
+            { word: 'Mamá', category: 'Familia', icon: '👩' },
+            { word: 'Papá', category: 'Familia', icon: '👨' },
+            { word: 'Sol', category: 'Naturaleza', icon: '☀️' },
+            { word: 'Pan', category: 'Comida', icon: '🍞' }
           ]
         });
         return;
@@ -104,29 +133,39 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
         .slice(0, 3);
 
       const weaknesses = Object.entries(wordsMap)
-        .filter(([_, stats]) => (stats.totalAttempts / stats.successCount) > 2)
+        .filter(([_, stats]) => (stats.totalAttempts / (stats.successCount || 1)) > 2)
         .map(([word]) => word)
         .slice(0, 3);
 
+      const levelInsight = `En su nivel ${child.learningLevel.toUpperCase()}, ${child.name} está ${child.learningLevel === 'alfabético' ? 'consolidando la fluidez' : 'construyendo la base silábica'}.`;
+      
       const insightText = weaknesses.length > 0
-        ? `${child.name} muestra cierta dificultad con las palabras "${weaknesses.join(', ')}". Su tasa de éxito general es de ${((strengths.length / (strengths.length + weaknesses.length)) * 100).toFixed(0)}%.`
-        : `${child.name} está progresando excelente en el nivel ${child.difficulty}. Ha dominado palabras clave como "${strengths.join(', ')}".`;
+        ? `${levelInsight} Presenta dificultad puntual en "${weaknesses.join(', ')}", lo que sugiere un refuerzo en la discriminación auditiva de estos fonemas. Su perfil ${child.learningStyle} indica que aprenderá mejor si se refuerza con ${child.learningStyle === 'visual' ? 'gráficos HD' : 'instrucciones rítmicas'}.`
+        : `${levelInsight} Ha dominado con éxito términos como "${strengths.join(', ')}". Su estilo ${child.learningStyle} está siendo clave para su rápida progresión en Mundos Mágicos.`;
 
       setIaAnalysis({
-        strengths: strengths.length > 0 ? strengths : ['Vocabulario base'],
-        weaknesses: weaknesses.length > 0 ? weaknesses : ['Nivel de frustración bajo'],
+        strengths: strengths.length > 0 ? strengths : ['Asimilación de instrucciones'],
+        weaknesses: weaknesses.length > 0 ? weaknesses : ['Aceptación de errores (Resiliencia)'],
         insights: insightText,
         suggestions: [
           { 
-            title: weaknesses.length > 0 ? 'Refuerzo de Fonemas' : 'Desafío de Velocidad', 
-            desc: weaknesses.length > 0 ? `Practicar específicamente los sonidos de ${weaknesses.join(', ')}.` : 'Intentar completar actividades en menos de 2 minutos.',
-            type: weaknesses.length > 0 ? 'Fonológico' : 'Cognitivo'
+            title: child.learningLevel === 'presilábico' ? 'Segmentación Auditiva' : 'Formación de Sílabas', 
+            desc: child.learningLevel === 'presilábico' ? 'Contar las "bromas" o sonidos de cada palabra.' : 'Unir letras para formar los objetos que ha fallado.',
+            type: 'Específico Nivel'
           },
           { 
-            title: 'Expansión de Categoría', 
-            desc: `Pasar de objetos simples a acciones relacionadas con ${child.learningLevel}.`, 
-            type: 'Semántico'
+            title: `Refuerzo ${child.learningStyle.charAt(0).toUpperCase() + child.learningStyle.slice(1)}`, 
+            desc: styleAdvices[child.learningStyle], 
+            type: 'Aprendizaje'
           }
+        ],
+        relatedWords: [
+          { word: 'Libro', category: 'Cosas', icon: '📚' },
+          { word: 'Lápiz', category: 'Cosas', icon: '✏️' },
+          { word: 'Mesa', category: 'Hogar', icon: '🪑' },
+          { word: 'Pelota', category: 'Juego', icon: '⚽' },
+          { word: 'Vaso', category: 'Comida', icon: '🥛' },
+          { word: 'Cuchara', category: 'Comida', icon: '🥄' }
         ]
       });
     } catch (error) {
@@ -141,33 +180,45 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
       setHasAttemptedAutoLogin(true);
       handleLogin('guest');
     }
-    if (user) {
-      fetchChildren();
-    }
   }, [user, loading, hasAttemptedAutoLogin, loginError]);
 
-  const fetchChildren = async () => {
-    if (!auth.currentUser) return;
-    const path = 'children';
-    try {
-      const q = query(collection(db, path), where('therapistId', '==', auth.currentUser.uid));
-      const snapshot = await getDocs(q);
-      setChildren(snapshot.docs.map(doc => doc.data() as Child));
-    } catch (error) {
-      handleFirestoreError(error, 'list', path);
-    }
-  };
+  useEffect(() => {
+    if (!user || !auth.currentUser) return;
 
-  const fetchSessions = async (childId: string) => {
-    const path = `children/${childId}/sessions`;
-    try {
-      const q = query(collection(db, path));
-      const snapshot = await getDocs(q);
-      setSessions(snapshot.docs.map(doc => doc.data() as Session));
-    } catch (error) {
-      handleFirestoreError(error, 'list', path);
+    const path = 'children';
+    const q = query(
+      collection(db, path), 
+      where('therapistId', '==', auth.currentUser.uid)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const childrenData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Child));
+      setChildren(childrenData);
+    }, (error) => {
+      console.error("Error listening to children:", error);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  useEffect(() => {
+    if (!selectedChild) {
+      setSessions([]);
+      return;
     }
-  };
+
+    const path = `children/${selectedChild.id}/sessions`;
+    const q = query(collection(db, path), orderBy('date', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const sessionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session));
+      setSessions(sessionsData);
+    }, (error) => {
+      console.error("Error listening to sessions:", error);
+    });
+
+    return () => unsubscribe();
+  }, [selectedChild]);
 
   const handleLogin = async (type: 'google' | 'guest') => {
     setLoading(true);
@@ -227,6 +278,17 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deleteChild = async (childId: string) => {
+    if (!window.confirm("¿Estás seguro de que quieres eliminar a este explorador? Esta acción no se puede deshacer y se borrarán todas sus aventuras.")) return;
+    
+    try {
+      await deleteDoc(doc(db, 'children', childId));
+      setSelectedChild(null);
+    } catch (error) {
+       console.error("Error deleting child:", error);
     }
   };
 
@@ -537,24 +599,17 @@ Su compromiso y alegría al interactuar con el asistente virtual están favoreci
                     </div>
 
                     <div className="space-y-8">
-                      {(children.length > 0 ? children.slice(0, 4) : [
-                        { id: 1, name: 'Nico', age: 6, tags: ['TEL', 'Nivel Silábico'], session: 'Hoy, 10:30 AM', progress: 85, avatar: '👦' },
-                        { id: 2, name: 'Sofía', age: 5, tags: ['Dislexia', 'Nivel Alfabético'], session: 'Hoy, 9:15 AM', progress: 72, avatar: '👧' },
-                        { id: 3, name: 'Mateo', age: 7, tags: ['Fonológico', 'Nivel Silábico'], session: 'Ayer, 4:20 PM', progress: 65, avatar: '👦' },
-                        { id: 4, name: 'Valentina', age: 6, tags: ['TEL', 'Alfabético'], session: 'Ayer, 11:00 AM', progress: 90, avatar: '👧' },
-                      ]).map((item, idx) => (
+                      {children.slice(0, 4).map((item, idx) => (
                         <div 
                           key={item.id} 
                           className="flex items-center gap-6 group cursor-pointer text-left"
-                          onClick={() => {
-                            if (item.id.toString().length > 1) { // if real child
-                              setSelectedChild(item as any);
-                              fetchSessions(item.id as any);
-                            }
-                          }}
+                          onClick={() => setSelectedChild(item)}
                         >
-                          <div className="w-16 h-16 bg-blue-50 rounded-full overflow-hidden flex shrink-0 items-center justify-center text-4xl border-2 border-white shadow-sm transition-transform group-hover:scale-110">
-                            {item.avatar === '👦' ? '👦' : item.avatar === '👧' ? '👧' : (item.avatar === 'lion' ? '🦁' : '🐰')}
+                          <div className={cn(
+                            "w-16 h-16 rounded-full overflow-hidden flex shrink-0 items-center justify-center text-4xl border-4 shadow-sm transition-transform group-hover:scale-110",
+                            item.status === 'active' ? 'border-emerald-400 bg-emerald-50' : 'border-white bg-blue-50'
+                          )}>
+                            {item.avatar === 'lion' ? '🦁' : item.avatar === 'rabbit' ? '🐰' : item.avatar === 'panda' ? '🐼' : item.avatar === 'fox' ? '🦊' : item.avatar === 'owl' ? '🦉' : (item.avatar === 'unicord' || item.avatar === 'unicorn') ? '🦄' : '🧒'}
                           </div>
                           
                           <div className="flex-1 flex items-center justify-between">
@@ -562,18 +617,21 @@ Su compromiso y alegría al interactuar con el asistente virtual están favoreci
                               <h4 className="text-lg font-black text-slate-800 mb-0.5">{item.name}</h4>
                               <p className="text-xs font-bold text-slate-400 uppercase mb-2">{item.age} años</p>
                               <div className="flex flex-wrap gap-1">
-                                {(item.tags || ['TEL', 'Nivel Silábico']).map(tag => (
-                                  <span key={tag} className={cn("px-2 py-0.5 rounded-lg text-[9px] font-black uppercase", tag === 'Dislexia' ? 'bg-pink-50 text-pink-500' : tag === 'Fonológico' ? 'bg-orange-50 text-orange-500' : 'bg-purple-50 text-purple-500')}>
-                                    {tag}
+                                <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-purple-50 text-purple-500">
+                                  {item.learningLevel}
+                                </span>
+                                {item.status === 'active' && (
+                                  <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-emerald-50 text-emerald-500 animate-pulse">
+                                    En Vivo
                                   </span>
-                                ))}
+                                )}
                               </div>
                             </div>
 
                             <div className="w-1/3">
-                               <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Sesión reciente:</p>
-                               <p className="text-[10px] font-black text-slate-600 mb-1">{item.session || 'En progreso'}</p>
-                               <p className="text-[10px] font-bold text-slate-300">Progreso:</p>
+                               <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Última actividad:</p>
+                               <p className="text-[10px] font-black text-slate-600 mb-1">{item.lastSessionAt ? new Date(item.lastSessionAt).toLocaleDateString() : 'Nunca'}</p>
+                               <p className="text-[10px] font-bold text-slate-300">Puntos: {item.points}</p>
                             </div>
 
                             <div className="w-1/3 flex flex-col items-end gap-2">
@@ -581,17 +639,25 @@ Su compromiso y alegría al interactuar con el asistente virtual están favoreci
                                 <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                                   <motion.div 
                                     initial={{ width: 0 }}
-                                    animate={{ width: `${item.progress}%` }}
-                                    className={cn("h-full rounded-full transition-all", item.progress > 80 ? 'bg-emerald-400' : item.progress > 60 ? 'bg-emerald-300' : 'bg-yellow-400')}
+                                    animate={{ width: `${Math.min(100, Math.floor((item.points / 500) * 100))}%` }}
+                                    className="h-full bg-emerald-400 rounded-full shadow-sm"
                                   />
                                 </div>
-                                <span className={cn("text-[10px] font-black italic", item.progress > 80 ? 'text-emerald-500' : 'text-slate-400')}>{item.progress}%</span>
+                                <span className="text-[10px] font-black italic text-slate-400">
+                                  {Math.min(100, Math.floor((item.points / 500) * 100))}%
+                                </span>
                               </div>
                               <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-[#5D469E] transition-all group-hover:translate-x-1" />
                             </div>
                           </div>
                         </div>
                       ))}
+                      
+                      {children.length === 0 && (
+                        <div className="py-10 text-center">
+                          <p className="text-slate-300 font-bold italic">No hay exploradores registrados aún.</p>
+                        </div>
+                      )}
                     </div>
                   </section>
 
@@ -759,30 +825,68 @@ Su compromiso y alegría al interactuar con el asistente virtual están favoreci
 
           {activeTab === 'vivo' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
-              <h1 className="text-5xl font-black text-slate-800 mb-6 tracking-tight">Sesiones en Vivo</h1>
+              <div className="flex justify-between items-end">
+                <div>
+                  <h1 className="text-5xl font-black text-slate-800 mb-2 tracking-tight">Sesiones en Vivo</h1>
+                  <p className="text-slate-400 font-medium">Monitorea el progreso de los exploradores que están jugando ahora.</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {children.slice(0, 3).map(child => (
-                  <div key={child.id} className="bg-white p-8 rounded-[3rem] shadow-xl border-4 border-emerald-100 relative group">
+                {children.filter(c => c.status === 'active').map(child => (
+                  <div key={child.id} className="bg-white p-8 rounded-[3rem] shadow-xl border-4 border-emerald-100 relative group animate-in fade-in slide-in-from-bottom-4">
                     <div className="absolute top-6 right-6">
                       <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1 rounded-full">
                         <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                        <span className="text-[10px] font-black text-emerald-600 uppercase">Activo</span>
+                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Activo ahora</span>
                       </div>
                     </div>
-                    <div className="text-6xl mb-6">{child.avatar === 'lion' ? '🦁' : '🐰'}</div>
-                    <h3 className="text-2xl font-black mb-2">{child.name}</h3>
-                    <p className="text-slate-400 text-sm font-bold mb-6">Mundo {child.difficulty.toUpperCase()}</p>
+                    <div className="text-7xl mb-6 transform group-hover:scale-110 transition-transform">
+                      {child.avatar === 'lion' ? '🦁' : child.avatar === 'rabbit' ? '🐰' : child.avatar === 'panda' ? '🐼' : child.avatar === 'fox' ? '🦊' : child.avatar === 'owl' ? '🦉' : '🦄'}
+                    </div>
+                    <h3 className="text-2xl font-black mb-1">{child.name}</h3>
+                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-6">Mundo {child.difficulty.toUpperCase()}</p>
+                    
+                    <div className="space-y-4 mb-8">
+                      <div className="p-4 bg-slate-50 rounded-2xl">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Palabra actual</p>
+                        <p className="text-lg font-black text-slate-700 italic">"{child.lastActivity || '---'}"</p>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase">
+                          <span>Progreso</span>
+                          <span>{child.progressPercent || 0}%</span>
+                        </div>
+                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${child.progressPercent || 0}%` }}
+                            className="h-full bg-emerald-400"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     <button 
                       onClick={() => {
                         setSelectedChild(child);
-                        fetchSessions(child.id);
+                        setActiveTab('inicio');
                       }}
-                      className="w-full bg-[#5D469E] text-white py-4 rounded-2xl font-black uppercase text-xs hover:bg-[#4a3683] transition-all"
+                      className="w-full bg-[#5D469E] text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-[#4a3683] transition-all shadow-lg"
                     >
-                      Monitorear
+                      Entrar a la sesión
                     </button>
                   </div>
                 ))}
+                
+                {children.filter(c => c.status === 'active').length === 0 && (
+                  <div className="col-span-full py-32 bg-white rounded-[4rem] text-center border-4 border-dashed border-slate-100 italic">
+                    <div className="text-6xl mb-6 grayscale opacity-20">📡</div>
+                    <h3 className="text-2xl font-black text-slate-300 uppercase tracking-tighter">Esperando exploradores...</h3>
+                    <p className="text-slate-200 font-bold max-w-sm mx-auto mt-2 italic">Cuando un niño inicie una actividad, aparecerá aquí automáticamente en tiempo real.</p>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -807,7 +911,7 @@ Su compromiso y alegría al interactuar con el asistente virtual están favoreci
                       <button 
                         onClick={() => {
                           setSelectedChild(child);
-                          fetchSessions(child.id).then(() => setIsReportOpen(true));
+                          setIsReportOpen(true);
                         }}
                         className="bg-emerald-500 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-600 transition-all flex items-center gap-2"
                       >
@@ -985,6 +1089,44 @@ Su compromiso y alegría al interactuar con el asistente virtual están favoreci
                     </div>
                   </div>
 
+                  {/* Related Vocabulary Section */}
+                  <div className="bg-white p-12 rounded-[4rem] shadow-xl border-4 border-slate-50 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl opacity-30 -translate-y-1/2 translate-x-1/2" />
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-3 mb-10">
+                        <div className="bg-emerald-50 p-3 rounded-2xl">
+                          <Book className="w-8 h-8 text-emerald-500" />
+                        </div>
+                        <div>
+                          <h3 className="text-3xl font-black text-slate-800 uppercase italic tracking-tighter">Diccionario de Aventuras</h3>
+                          <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">Palabras clave recomendadas por la IA</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        {iaAnalysis?.relatedWords?.map((rw, i) => (
+                          <motion.div 
+                            key={i}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.1 }}
+                            className="bg-slate-50 p-6 rounded-[2.5rem] text-center border-2 border-transparent hover:border-emerald-200 transition-all cursor-default group"
+                          >
+                            <div className="text-4xl mb-3 transform group-hover:scale-125 transition-transform duration-300">
+                              {rw.icon}
+                            </div>
+                            <h4 className="text-lg font-black text-slate-800">{rw.word}</h4>
+                            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-1">{rw.category}</p>
+                          </motion.div>
+                        ))}
+                      </div>
+
+                      <button className="mt-10 mx-auto block bg-white border-2 border-emerald-100 text-emerald-500 px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-50 transition-all shadow-sm">
+                        Exportar a la próxima sesión de {selectedChildIA.name}
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Suggested Activities */}
                   <div>
                     <h3 className="text-3xl font-black text-slate-800 mb-8 uppercase italic tracking-tighter ml-6">Actividades Recomendadas</h3>
@@ -1132,7 +1274,6 @@ Su compromiso y alegría al interactuar con el asistente virtual están favoreci
                     className="bg-white p-10 rounded-[3rem] shadow-xl shadow-slate-100/50 border-4 border-white group cursor-pointer transition-all text-left"
                     onClick={() => {
                       setSelectedChild(child);
-                      fetchSessions(child.id);
                     }}
                   >
                     <div className="flex items-start justify-between mb-8">
@@ -1200,6 +1341,12 @@ Su compromiso y alegría al interactuar con el asistente virtual están favoreci
                     className="p-5 bg-white border-4 border-slate-50 text-slate-400 hover:text-purple-600 rounded-[2rem] shadow-xl transition-all hover:bg-purple-50 group"
                   >
                     <FileText className="w-8 h-8 group-hover:scale-110 transition-transform" />
+                  </button>
+                  <button 
+                    onClick={() => deleteChild(selectedChild.id)}
+                    className="p-5 bg-red-50 border-4 border-red-50 text-red-300 hover:text-red-500 rounded-[2rem] shadow-xl transition-all hover:bg-red-100 group"
+                  >
+                    <X className="w-8 h-8 group-hover:scale-110 transition-transform" />
                   </button>
                </div>
 

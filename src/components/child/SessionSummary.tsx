@@ -23,14 +23,14 @@ export function SessionSummary({ child, session, onDone, onBackToMap }: SessionS
         angle: 60,
         spread: 55,
         origin: { x: 0 },
-        colors: ['#3b82f6', '#fbbf24']
+        colors: [child.themeColor || '#3b82f6', '#fbbf24']
       });
       confetti({
         particleCount: 2,
         angle: 120,
         spread: 55,
         origin: { x: 1 },
-        colors: ['#3b82f6', '#fbbf24']
+        colors: [child.themeColor || '#3b82f6', '#fbbf24']
       });
 
       if (Date.now() < end) {
@@ -45,7 +45,7 @@ export function SessionSummary({ child, session, onDone, onBackToMap }: SessionS
       {/* Background patterns */}
       <div className="absolute inset-0 opacity-10 flex flex-wrap gap-20 p-20 select-none pointer-events-none z-0">
         {Array.from({ length: 20 }).map((_, i) => (
-          <Star key={i} className="w-12 h-12 text-blue-300" />
+          <Star key={i} className="w-12 h-12 text-primary" />
         ))}
       </div>
 
@@ -74,10 +74,10 @@ export function SessionSummary({ child, session, onDone, onBackToMap }: SessionS
               <span className="text-3xl font-black text-yellow-700">+{session.starsEarned}</span>
               <span className="text-xs font-bold text-yellow-600/60 uppercase tracking-widest mt-1">Estrellas</span>
            </div>
-           <div className="bg-blue-50 p-6 rounded-3xl border-2 border-blue-100 flex flex-col items-center">
-              <Trophy className="w-10 h-10 text-blue-500 mb-2" />
-              <span className="text-3xl font-black text-blue-700">+{session.pointsEarned}</span>
-              <span className="text-xs font-bold text-blue-600/60 uppercase tracking-widest mt-1">Puntos</span>
+           <div className="bg-primary-light p-6 rounded-3xl border-2 border-primary/20 flex flex-col items-center">
+              <Trophy className="w-10 h-10 text-primary mb-2" />
+              <span className="text-3xl font-black text-primary">+{session.pointsEarned}</span>
+              <span className="text-xs font-bold text-primary/60 uppercase tracking-widest mt-1">Puntos</span>
            </div>
         </div>
 
@@ -101,7 +101,7 @@ export function SessionSummary({ child, session, onDone, onBackToMap }: SessionS
         <div className="flex flex-col gap-4">
           <button 
             onClick={onBackToMap}
-            className="w-full bg-blue-600 text-white py-5 rounded-[1.5rem] text-xl font-black flex items-center justify-center gap-3 shadow-xl shadow-blue-200 hover:bg-blue-700 transform hover:scale-105 transition-all"
+            className="w-full bg-primary text-white py-5 rounded-[1.5rem] text-xl font-black flex items-center justify-center gap-3 shadow-xl shadow-primary/20 hover:opacity-90 transform hover:scale-105 transition-all"
           >
             Volver al Mapa <ArrowRight className="w-6 h-6" />
           </button>

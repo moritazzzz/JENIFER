@@ -103,6 +103,22 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const container = document.querySelector('.app-container') as HTMLElement;
+    if (container && activeChild) {
+      const color = activeChild.themeColor;
+      container.style.setProperty('--primary-color', color);
+      
+      // We can use a helper or just hex manipulation for light/dark
+      // For now, let's just use the selected color and a light version
+      container.style.setProperty('--primary-light', `${color}20`); // 20 alpha (~12%)
+    } else if (container) {
+      // Default to blue
+      container.style.setProperty('--primary-color', '#3B82F6');
+      container.style.setProperty('--primary-light', '#EFF6FF');
+    }
+  }, [activeChild]);
+
   const handleStartChildAdventure = (child: Child) => {
     setActiveChild(child);
     setView('world-map');

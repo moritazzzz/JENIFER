@@ -89,7 +89,8 @@ export function ChildSetup({ onComplete, onBack }: ChildSetupProps) {
               placeholder="Escribe tu nombre aquí"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
-              className="w-full p-4 text-2xl border-4 border-blue-100 rounded-3xl focus:border-blue-400 outline-none transition-all text-center"
+              style={{ borderColor: formData.themeColor + '40' }}
+              className="w-full p-4 text-2xl border-4 rounded-3xl focus:border-opacity-100 outline-none transition-all text-center"
             />
             <div className="mt-8 flex justify-center gap-4">
               <p className="text-xl text-gray-600">Y tengo </p>
@@ -99,7 +100,8 @@ export function ChildSetup({ onComplete, onBack }: ChildSetupProps) {
                 max="12"
                 value={formData.age}
                 onChange={e => setFormData({ ...formData, age: parseInt(e.target.value) })}
-                className="w-20 p-2 text-xl border-b-4 border-blue-200 outline-none text-center font-bold"
+                style={{ borderBottomColor: formData.themeColor }}
+                className="w-20 p-2 text-xl border-b-4 outline-none text-center font-bold"
               />
               <p className="text-xl text-gray-600">años</p>
             </div>
@@ -273,7 +275,8 @@ export function ChildSetup({ onComplete, onBack }: ChildSetupProps) {
                 whileTap={{ scale: 0.95 }}
                 onClick={nextStep}
                 disabled={step === 1 && !formData.name}
-                className="bg-blue-500 text-white px-12 py-4 rounded-2xl font-bold text-xl flex items-center gap-2 disabled:opacity-50"
+                style={{ backgroundColor: formData.themeColor }}
+                className="text-white px-12 py-4 rounded-2xl font-bold text-xl flex items-center gap-2 disabled:opacity-50"
               >
                 Siguiente <ArrowRight className="w-6 h-6" />
               </motion.button>

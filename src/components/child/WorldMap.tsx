@@ -134,7 +134,7 @@ export function WorldMap({ child, onSelectActivity, onBack }: WorldMapProps) {
         <header className="flex flex-col md:flex-row justify-between items-center gap-6">
           <button 
             onClick={onBack}
-            className="w-14 h-14 bg-white border-2 border-slate-100 hover:border-purple-200 rounded-full flex items-center justify-center text-purple-500 shadow-sm transition-all hover:scale-110 active:scale-90 shrink-0"
+            className="w-14 h-14 bg-white border-2 border-slate-100 hover:border-primary-light rounded-full flex items-center justify-center text-primary shadow-sm transition-all hover:scale-110 active:scale-90 shrink-0"
           >
             <ArrowLeft className="w-6 h-6" strokeWidth={3} />
           </button>
@@ -148,7 +148,7 @@ export function WorldMap({ child, onSelectActivity, onBack }: WorldMapProps) {
             </p>
           </div>
 
-          <button className="flex items-center gap-2 bg-[#F1EEFF] text-[#8B6EDC] px-6 py-3 rounded-full font-black text-sm uppercase tracking-wider hover:bg-[#E8E4FF] transition-colors border-b-4 border-[#DCD6FF] shrink-0">
+          <button className="flex items-center gap-2 bg-primary-light text-primary px-6 py-3 rounded-full font-black text-sm uppercase tracking-wider hover:opacity-80 transition-opacity border-b-4 border-primary/20 shrink-0">
             <Settings className="w-5 h-5" />
             Ajustes
           </button>
@@ -175,14 +175,14 @@ export function WorldMap({ child, onSelectActivity, onBack }: WorldMapProps) {
               
               <div className="flex gap-2">
                 <span className="bg-[#E1F6FF] text-[#00A3FF] px-4 py-1.5 rounded-xl font-black text-xs uppercase tracking-tight">{child.learningLevel || 'TEL'}</span>
-                <span className="bg-[#F1EEFF] text-[#8B6EDC] px-4 py-1.5 rounded-xl font-black text-xs uppercase tracking-tight text-center">Nivel Silábico</span>
+                <span className="bg-primary-light text-primary px-4 py-1.5 rounded-xl font-black text-xs uppercase tracking-tight text-center">Nivel Silábico</span>
               </div>
             </div>
 
             <div className="h-20 w-[2px] bg-slate-100 mx-4" />
 
             <div className="text-center pr-4">
-              <div className="w-12 h-12 bg-[#F1EEFF] rounded-2xl flex items-center justify-center text-[#8B6EDC] mb-2 mx-auto ring-4 ring-[#F7FBFE] shadow-sm">
+              <div className="w-12 h-12 bg-primary-light rounded-2xl flex items-center justify-center text-primary mb-2 mx-auto ring-4 ring-[#F7FBFE] shadow-sm">
                 <Clock className="w-6 h-6" />
               </div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sesión:</p>
@@ -199,7 +199,7 @@ export function WorldMap({ child, onSelectActivity, onBack }: WorldMapProps) {
             <div className="relative">
               <div className="bg-white p-6 rounded-[2rem] border-4 border-slate-50 shadow-xl max-w-[240px] relative z-10">
                 <p className="text-slate-600 font-bold text-sm leading-relaxed">
-                  ¡Estoy aquí para ayudarte a aprender y divertirte! <span className="text-purple-500">💜</span>
+                  ¡Estoy aquí para ayudarte a aprender y divertirte! <span className="text-primary">💜</span>
                 </p>
                 {/* Speech bubble arrow */}
                 <div className="absolute right-[-10px] top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-r-4 border-t-4 border-slate-50 rotate-45 z-0" />
@@ -218,7 +218,7 @@ export function WorldMap({ child, onSelectActivity, onBack }: WorldMapProps) {
               </div>
               {/* Antenna */}
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-1 h-8 bg-slate-300">
-                <div className="w-3 h-3 bg-purple-500 rounded-full -mt-1 mx-auto shadow-lg" />
+                <div className="w-3 h-3 bg-primary rounded-full -mt-1 mx-auto shadow-lg" />
               </div>
               {/* Arms */}
               <div className="absolute -left-8 top-1/2 -translate-y-1/2 w-12 h-6 bg-slate-200 rounded-full -rotate-12" />
@@ -400,10 +400,10 @@ export function WorldMap({ child, onSelectActivity, onBack }: WorldMapProps) {
            {/* Start Button */}
            <button 
              onClick={() => onSelectActivity('easy')}
-             className="bg-[#9E7BFF] text-white px-10 py-6 lg:py-0 rounded-[2.5rem] flex items-center justify-center lg:justify-start gap-6 shadow-xl shadow-purple-100 hover:bg-[#8B6EDC] transition-all hover:scale-[1.02] active:scale-95 group border-b-8 border-[#7C5CC9]"
+             className="bg-primary text-white px-10 py-6 lg:py-0 rounded-[2.5rem] flex items-center justify-center lg:justify-start gap-6 shadow-xl shadow-primary/20 hover:opacity-90 transition-all hover:scale-[1.02] active:scale-95 group border-b-8 border-primary-dark/80"
            >
               <span className="text-2xl font-black tracking-tight leading-none uppercase">Empezar actividad</span>
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-[#9E7BFF] group-hover:translate-x-2 transition-transform shadow-lg shrink-0">
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-primary group-hover:translate-x-2 transition-transform shadow-lg shrink-0">
                 <ArrowRight className="w-6 h-6 outline-none" strokeWidth={4} />
               </div>
            </button>

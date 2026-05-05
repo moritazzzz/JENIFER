@@ -16,33 +16,55 @@ export interface GeneratedActivity {
   displayChallenge?: string; // For Level 3 (Hard)
 }
 
-export async function generateSessionActivities(difficulty: 'easy' | 'medium' | 'hard', count: number = 5): Promise<GeneratedActivity[]> {
+export async function generateSessionActivities(
+  difficulty: 'easy' | 'medium' | 'hard', 
+  learningLevel: string,
+  age: number,
+  learningStyle: string,
+  avoidWords: string[] = [],
+  count: number = 10
+): Promise<GeneratedActivity[]> {
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-  const difficultyDesc = {
-    easy: "Nivel Inicial (4-5 años): Enfoque en vocales y palabras bisílabas simples (CV+CV) como 'mesa', 'pato', 'luna'. Repetición directa.",
-    medium: "Nivel Intermedio (5-6 años): Palabras de 2-3 sílabas con fonemas más variados. Identificación visual de objetos cotidianos.",
-    hard: "Nivel Avanzado (6-8 años): Palabras con fonemas complejos (RR, L, D al final) o grupos consonánticos (TR, PL, BR) como 'tren', 'plátano', 'perro', 'mariposa'. Enfoque en completar letras faltantes."
+  const levelSpecifics = {
+    'presilábico': "Usa palabras muy cortas (1-2 sílabas), extremadamente familiares en ESPAÑOL (mamá, sol, pan, ojo) y asegura que el emoji sea muy claro.",
+    'silábico': "Usa palabras de 2 a 3 sílabas en ESPAÑOL. Divide las sílabas visualmente con guiones (PA-TO).",
+    'alfabético': "Usa palabras completas de variada complejidad en ESPAÑOL. El enfoque es la formación y lectura fluida."
   };
 
-  const prompt = `Actúa como un logopeda pediátrico experto. 
-  Genera ${count} actividades para un niño de 4 a 8 años con dificultades de habla, nivel: ${difficulty}.
-  ${difficultyDesc[difficulty]}.
+  const styleSpecifics = {
+    'visual': "Asegúrate de que las pistas ('hint') sean muy visuales y descriptivas de la imagen.",
+    'auditivo': "Las instrucciones deben centrarse en los sonidos iniciales y la rima. Ej: '¿Qué palabra empieza con el sonido SSS?'",
+    'escritura': "Genera pistas que animen a identificar las letras que componen la palabra."
+  };
 
-  REGLAS DE VOCABULARIO:
-  1. Usa palabras que un niño de esa edad conozca perfectamente.
-  2. Evita conceptos abstractos. Solo objetos, animales o acciones visibles.
-  3. Para 'hard', usa palabras que tengan sonidos que suelen costar (R, RR, grupos con L o R como 'globo' o 'fresa').
-  4. 'image' debe ser un emoji que el niño reconozca al instante. Incluye SIEMPRE un emoji en 'image' para todos los niveles.
-  5. 'syllables' debe estar dividido claramente: 'ma... ri... po... sa'.
-  6. 'instruction' debe ser muy dulce y motivadora. NUNCA incluyas guiones bajos (_) ni símbolos técnicos en este campo, ya que se leerán en voz alta. Si quieres referirte a una palabra incompleta, di simplemente "esta palabra" o su nombre real. EVITA mencionar personajes o a ti mismo.
-  7. Para 'medium', las 'options' deben ser palabras visualmente distintas.
+  const prompt = `Actúa como un logopeda pediátrico experto de habla HISPANA. 
+  Genera ${count} actividades ÚNICAS, CREATIVAS y VARIADAS para un niño de ${age} años.
   
-  JSON SCHEMA: Devuelve un arreglo JSON con: id, title, word, syllables, points, hint, pronunciationTip, instruction, image, options (solo medium), displayChallenge (solo hard, ej: 'MA_IP_SA'). El campo displayChallenge SÍ puede tener guiones bajos.
-
-  EJEMPLO JSON para Easy:
+  CONTEXTO CLAVE:
+  - Nivel de Dificultad (Mundo): ${difficulty.toUpperCase()}
+  - Nivel de Aprendizaje (Etapa Lectoescritora): ${learningLevel} (${levelSpecifics[learningLevel as keyof typeof levelSpecifics] || ''})
+  - Estilo de Aprendizaje: ${learningStyle} (${styleSpecifics[learningStyle as keyof typeof styleSpecifics] || ''})
+  - Edad del niño: ${age} años
+  ${avoidWords.length > 0 ? `- EXITA ESTAS PALABRAS (ya usadas recientemente): ${avoidWords.join(', ')}` : ''}
+  
+  REGLAS DE VOCABULARIO Y TERAPIA (CRÍTICO):
+  1. TODAS las palabras y frases deben ser en ESPAÑOL. NUNCA uses inglés (no uses 'hard', 'easy', etc. como palabras del reto).
+  2. Adapta el contenido específicamente para un niño de ${age} años.
+  3. NIVEL PRESILÁBICO: Prioriza reconocimiento de imagen y sonido inicial.
+  4. NIVEL SILÁBICO: Divide claramente: 'PA-TO'.
+  5. NIVEL ALFABÉTICO: Palabras completas y retos de formación.
+  6. ESTILO VISUAL: Referencias directas a la forma y color de la imagen.
+  7. ESTILO AUDITIVO: Centrado en onomatopeyas, rimas y sonidos.
+  8. ESTILO ESCRITURA: Centrado en las letras y su orden.
+  9. VARIABILIDAD TOTAL: Usa comida, objetos del hogar, ropa, partes del cuerpo, animales, transporte.
+  10. Si la dificultad es 'HARD', usa palabras más largas y complejas (ej: 'hipopótamo', 'bicicleta') para que el reto de ordenar letras sea interesante.
+  
+  JSON SCHEMA: Devuelve un arreglo JSON con: id, title, word, syllables, points, hint, pronunciationTip, instruction, image, options (solo mediano), displayChallenge (solo difícil, ej: 'M_RC_ÉL_GO').
+  
+  EJEMPLO JSON:
   [
-    {"id": "ai-e1", "title": "Animal", "word": "Perro", "image": "🐶", "syllables": "Pe... rro", "points": 10, "hint": "Dice guau", "pronunciationTip": "Mueve la punta de la lengua", "instruction": "¡Mira! Este es un perro. ¿Puedes decir: perro?"}
+    {"id": "ai-1", "title": "Amigo del Hogar", "word": "Silla", "image": "🪑", "syllables": "Si-lla", "points": 15, "hint": "Sirve para sentarse y tiene 4 patas", "pronunciationTip": "Pon tus dientes juntos y sopla SSS", "instruction": "¡Mira esta silla! ¿Cómo se dice?"}
   ]`;
 
   try {

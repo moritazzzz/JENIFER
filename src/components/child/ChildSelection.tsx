@@ -74,9 +74,15 @@ export function ChildSelection({ onSelect, onCreateNew, onBack }: ChildSelection
                 whileHover={{ y: -10, scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => onSelect(child)}
-                className="bg-white/80 backdrop-blur-md border-8 border-white rounded-[3rem] p-8 shadow-2xl group flex flex-col items-center text-center transition-all"
+                className="bg-white/80 backdrop-blur-md border-8 border-white rounded-[3rem] p-8 shadow-2xl group flex flex-col items-center text-center transition-all relative overflow-hidden"
               >
-                <div className="text-8xl mb-6 group-hover:animate-bounce transform transition-transform">
+                {/* Theme strip */}
+                <div 
+                  className="absolute top-0 left-0 right-0 h-3" 
+                  style={{ backgroundColor: child.themeColor || '#3B82F6' }}
+                />
+
+                <div className="text-8xl mb-6 group-hover:animate-bounce transform transition-transform mt-4">
                   {child.avatar === 'lion' ? '🦁' : child.avatar === 'rabbit' ? '🐰' : child.avatar === 'panda' ? '🐼' : child.avatar === 'fox' ? '🦊' : child.avatar === 'owl' ? '🦉' : '🦄'}
                 </div>
                 
@@ -89,18 +95,30 @@ export function ChildSelection({ onSelect, onCreateNew, onBack }: ChildSelection
                     <Star className="w-4 h-4 fill-current" />
                     {child.stars}
                   </div>
-                  <div className="flex items-center gap-1 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">
+                  <div 
+                    className="flex items-center gap-1 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md"
+                    style={{ backgroundColor: child.themeColor || '#3B82F6' }}
+                  >
                     <Trophy className="w-4 h-4" />
                     {child.points}
                   </div>
                 </div>
 
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-2">
-                  <div className="h-full bg-green-400" style={{ width: `${Math.min(100, (child.points / 1000) * 100)}%` }} />
+                  <div 
+                    className="h-full" 
+                    style={{ 
+                      width: `${Math.min(100, (child.points / 1000) * 100)}%`,
+                      backgroundColor: child.themeColor || '#10B981'
+                    }} 
+                  />
                 </div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nivel: {child.learningLevel}</p>
                 
-                <div className="mt-6 flex items-center justify-center gap-2 text-blue-600 font-black uppercase text-sm">
+                <div 
+                  className="mt-6 flex items-center justify-center gap-2 font-black uppercase text-sm"
+                  style={{ color: child.themeColor || '#3B82F6' }}
+                >
                    ¡ENTRAR! <ChevronRight className="w-4 h-4" />
                 </div>
               </motion.button>

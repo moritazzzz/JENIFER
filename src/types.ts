@@ -18,6 +18,10 @@ export interface Child {
   points: number;
   stars: number;
   lastSessionAt?: string;
+  status?: 'active' | 'idle';
+  lastActivity?: string;
+  progressPercent?: number;
+  lastUpdateAt?: string;
 }
 
 export interface Session {
