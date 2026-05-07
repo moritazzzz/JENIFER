@@ -4,11 +4,34 @@ import { Sparkles, HeartHandshake, UserCircle } from 'lucide-react';
 interface WelcomeProps {
   onChildAccess: () => void;
   onTherapistAccess: () => void;
+  isAnonymousDisabled?: boolean;
 }
 
-export function Welcome({ onChildAccess, onTherapistAccess }: WelcomeProps) {
+export function Welcome({ onChildAccess, onTherapistAccess, isAnonymousDisabled }: WelcomeProps) {
   return (
     <div className="min-h-full flex flex-col items-center justify-center p-6 md:p-12 overflow-y-auto relative custom-scrollbar" style={{ background: "radial-gradient(circle at 50% 50%, #E0F2FE 0%, #BAE6FD 100%)" }}>
+      {/* Configuration Alert for Admins / Developers */}
+      {isAnonymousDisabled && (
+        <motion.div 
+          initial={{ y: -50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="absolute top-8 left-1/2 -translate-x-1/2 z-50 bg-white/90 backdrop-blur-xl border-4 border-yellow-400 p-4 rounded-3xl shadow-2xl max-w-md w-full flex items-center gap-4"
+        >
+          <div className="text-3xl">🛠️</div>
+          <div className="text-left">
+            <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest leading-none mb-1">Configuración Pendiente</h4>
+            <p className="text-[10px] text-slate-500 font-bold leading-tight">
+              Activa "Anonymous Auth" en Firebase Console para acceso instantáneo de invitados.
+            </p>
+          </div>
+          <button 
+            onClick={() => window.open('https://console.firebase.google.com/', '_blank')}
+            className="shrink-0 bg-yellow-400 text-white text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest hover:bg-yellow-500 transition-colors"
+          >
+            Abrir Consola
+          </button>
+        </motion.div>
+      )}
       {/* Decorative Elements */}
       <div className="absolute top-1/4 left-10 text-6xl opacity-30 animate-pulse hidden md:block">☁️</div>
       <div className="absolute top-1/3 right-1/4 text-5xl opacity-40 animate-bounce hidden md:block">☁️</div>

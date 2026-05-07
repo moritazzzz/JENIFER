@@ -46,19 +46,20 @@ export async function generateSessionActivities(
   - Nivel de Aprendizaje (Etapa Lectoescritora): ${learningLevel} (${levelSpecifics[learningLevel as keyof typeof levelSpecifics] || ''})
   - Estilo de Aprendizaje: ${learningStyle} (${styleSpecifics[learningStyle as keyof typeof styleSpecifics] || ''})
   - Edad del niño: ${age} años
-  ${avoidWords.length > 0 ? `- EXITA ESTAS PALABRAS (ya usadas recientemente): ${avoidWords.join(', ')}` : ''}
+  ${avoidWords.length > 0 ? `- EVITA ESTAS PALABRAS (ya usadas recientemente): ${avoidWords.join(', ')}` : ''}
   
   REGLAS DE VOCABULARIO Y TERAPIA (CRÍTICO):
-  1. TODAS las palabras y frases deben ser en ESPAÑOL. NUNCA uses inglés (no uses 'hard', 'easy', etc. como palabras del reto).
+  1. TODAS las palabras y frases deben ser en ESPAÑOL DE ESPAÑA/LATAM. NUNCA uses inglés (no uses 'hard', 'easy', etc. como palabras del reto).
   2. Adapta el contenido específicamente para un niño de ${age} años.
   3. NIVEL PRESILÁBICO: Prioriza reconocimiento de imagen y sonido inicial.
-  4. NIVEL SILÁBICO: Divide claramente: 'PA-TO'.
+  4. NIVEL SILÁBICO: Divide claramente con guiones: 'PA-TO'.
   5. NIVEL ALFABÉTICO: Palabras completas y retos de formación.
   6. ESTILO VISUAL: Referencias directas a la forma y color de la imagen.
   7. ESTILO AUDITIVO: Centrado en onomatopeyas, rimas y sonidos.
   8. ESTILO ESCRITURA: Centrado en las letras y su orden.
   9. VARIABILIDAD TOTAL: Usa comida, objetos del hogar, ropa, partes del cuerpo, animales, transporte.
-  10. Si la dificultad es 'HARD', usa palabras más largas y complejas (ej: 'hipopótamo', 'bicicleta') para que el reto de ordenar letras sea interesante.
+  10. Si la dificultad es 'HARD', usa PALABRAS CORTAS O MEDIANAS (máximo 10 letras) que sean retos interesantes (ej: 'guitarra', 'conejo'). EVITA FRASES LARGAS.
+  11. 'displayChallenge' (solo en HARD): Debe ser la palabra con 2 o 3 letras reemplazadas por guiones bajos (ej: 'GU_TA_RA').
   
   JSON SCHEMA: Devuelve un arreglo JSON con: id, title, word, syllables, points, hint, pronunciationTip, instruction, image, options (solo mediano), displayChallenge (solo difícil, ej: 'M_RC_ÉL_GO').
   

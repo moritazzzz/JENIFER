@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, ArrowRight, Check, Star, Mic, Music, Eye, PencilLine, Clock } from 'lucide-react';
 import { AVATARS, THEME_COLORS } from '../../constants';
 import { type Child, type LearningLevel, type Difficulty, type LearningStyle, type AssistantVoice } from '../../types';
-import { db, auth } from '../../services/firebase';
+import { db, auth, handleFirestoreError, OperationType } from '../../services/firebase';
 import { setDoc, doc } from 'firebase/firestore';
 import { cn } from '../../lib/utils';
 import confetti from 'canvas-confetti';
@@ -57,26 +57,10 @@ export function ChildSetup({ onComplete, onBack }: ChildSetupProps) {
 
       setTimeout(() => onComplete(completeChild), 1500);
     } catch (error) {
-      handleFirestoreError(error, 'write', path);
+      handleFirestoreError(error, OperationType.WRITE, path);
       setIsSubmitting(false);
     }
   };
-
-  function handleFirestoreError(error: unknown, operationType: string, path: string | null) {
-    const errInfo = {
-      error: error instanceof Error ? error.message : String(error),
-      authInfo: {
-        userId: auth.currentUser?.uid,
-        email: auth.currentUser?.email,
-        emailVerified: auth.currentUser?.emailVerified,
-        isAnonymous: auth.currentUser?.isAnonymous,
-      },
-      operationType,
-      path
-    };
-    console.error('Firestore Error: ', JSON.stringify(errInfo));
-    throw new Error(JSON.stringify(errInfo));
-  }
 
   const renderStep = () => {
     switch (step) {

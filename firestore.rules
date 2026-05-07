@@ -113,6 +113,7 @@ service cloud.firestore {
         );
         
         allow delete: if isSignedIn() && (
+          getChild().therapistId == request.auth.uid ||
           childId == request.auth.uid
         );
       }

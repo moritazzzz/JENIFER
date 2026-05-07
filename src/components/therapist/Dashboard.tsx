@@ -27,7 +27,7 @@ import {
   X,
   Book
 } from 'lucide-react';
-import { auth, db } from '../../services/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../../services/firebase';
 import { GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously } from 'firebase/auth';
 import { collection, query, where, getDocs, doc, setDoc, addDoc, serverTimestamp, onSnapshot, orderBy, deleteDoc } from 'firebase/firestore';
 import { type Child, type Therapist, type Session, type LiveCommand } from '../../types';
@@ -35,11 +35,12 @@ import { cn } from '../../lib/utils';
 
 interface TherapistDashboardProps {
   user: Therapist | null;
+  isAnonymousDisabled?: boolean;
   onBack: () => void;
   onStartChild: (child: Child) => void;
 }
 
-export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDashboardProps) {
+export function TherapistDashboard({ user, isAnonymousDisabled, onBack, onStartChild }: TherapistDashboardProps) {
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -169,18 +170,18 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
         ]
       });
     } catch (error) {
-      console.error("AI Analysis error:", error);
+      handleFirestoreError(error, OperationType.LIST, path);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!user && !loading && !hasAttemptedAutoLogin && !loginError) {
+    if (!user && !loading && !hasAttemptedAutoLogin && !loginError && !isAnonymousDisabled) {
       setHasAttemptedAutoLogin(true);
       handleLogin('guest');
     }
-  }, [user, loading, hasAttemptedAutoLogin, loginError]);
+  }, [user, loading, hasAttemptedAutoLogin, loginError, isAnonymousDisabled]);
 
   useEffect(() => {
     if (!user || !auth.currentUser) return;
@@ -195,7 +196,7 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
       const childrenData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Child));
       setChildren(childrenData);
     }, (error) => {
-      console.error("Error listening to children:", error);
+      handleFirestoreError(error, OperationType.GET, path);
     });
 
     return () => unsubscribe();
@@ -214,7 +215,7 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
       const sessionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session));
       setSessions(sessionsData);
     }, (error) => {
-      console.error("Error listening to sessions:", error);
+      handleFirestoreError(error, OperationType.GET, path);
     });
 
     return () => unsubscribe();
@@ -244,7 +245,7 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
         try {
           await setDoc(doc(db, 'therapists', result.user.uid), therapistData, { merge: true });
         } catch (error) {
-          handleFirestoreError(error, 'write', path);
+          handleFirestoreError(error, OperationType.WRITE, path);
         }
         // The App.tsx listener should pick this up
       } else {
@@ -263,14 +264,14 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
         try {
           await setDoc(doc(db, 'therapists', result.user.uid), therapistData, { merge: true });
         } catch (error) {
-          handleFirestoreError(error, 'write', path);
+          handleFirestoreError(error, OperationType.WRITE, path);
         }
         setIsAnonymously(true);
       }
     } catch (error: any) {
       console.error("Login failed:", error);
       if (error.code === 'auth/admin-restricted-operation') {
-        setLoginError("La creación de usuarios está restringida en la consola de Firebase. Por favor, habilita el registro de nuevos usuarios en la configuración de Authentication.");
+        setLoginError("La creación de usuarios anónimos está restringida en tu consola de Firebase. 1) Ve a Authentication > Sign-in method. 2) Activa 'Anónimo'. 3) Guarda los cambios.");
       } else if (error.code === 'auth/too-many-requests') {
         setLoginError("Demasiadas solicitudes de inicio de sesión. Por favor, espere un momento y actualice la página.");
       } else {
@@ -284,11 +285,12 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
   const deleteChild = async (childId: string) => {
     if (!window.confirm("¿Estás seguro de que quieres eliminar a este explorador? Esta acción no se puede deshacer y se borrarán todas sus aventuras.")) return;
     
+    const path = `children/${childId}`;
     try {
       await deleteDoc(doc(db, 'children', childId));
       setSelectedChild(null);
     } catch (error) {
-       console.error("Error deleting child:", error);
+       handleFirestoreError(error, OperationType.DELETE, path);
     }
   };
 
@@ -330,7 +332,7 @@ export function TherapistDashboard({ user, onBack, onStartChild }: TherapistDash
       });
       if (type === 'message') setLiveMsg('');
     } catch (error) {
-      handleFirestoreError(error, 'write', path);
+      handleFirestoreError(error, OperationType.WRITE, path);
     }
   };
 
@@ -382,60 +384,87 @@ Su compromiso y alegría al interactuar con el asistente virtual están favoreci
     `;
   };
 
-  function handleFirestoreError(error: unknown, operationType: string, path: string | null) {
-    const errInfo = {
-      error: error instanceof Error ? error.message : String(error),
-      authInfo: {
-        userId: auth.currentUser?.uid,
-        email: auth.currentUser?.email,
-        emailVerified: auth.currentUser?.emailVerified,
-        isAnonymous: auth.currentUser?.isAnonymous,
-      },
-      operationType,
-      path
-    };
-    console.error('Firestore Error: ', JSON.stringify(errInfo));
-    throw new Error(JSON.stringify(errInfo));
-  }
+  // Removed local helper in favor of imported one
 
   if (!user || loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F7F9FF] p-6">
-        {loginError && (
+        {(loginError || isAnonymousDisabled) && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-8 p-6 bg-white rounded-3xl shadow-xl border-4 border-red-50 max-w-md text-center"
+            className="mb-8 p-8 bg-white rounded-[3rem] shadow-2xl border-8 border-white max-w-lg text-center"
           >
-            <div className="text-4xl mb-4">🛠️</div>
-            <h2 className="text-xl font-black text-slate-800 mb-2 uppercase italic tracking-tighter">Acceso Restringido</h2>
-            <p className="text-slate-500 text-sm font-medium mb-6">
-              Para habilitar el ingreso instantáneo, por favor activa el proveedor <b>"Anónimo"</b> en la pestaña de <b>Authentication</b> de tu Consola de Firebase.
+            <div className="text-6xl mb-6">🛠️</div>
+            <h2 className="text-2xl font-black text-slate-800 mb-2 uppercase italic tracking-tighter">
+              {isAnonymousDisabled ? "Configuración Requerida" : "Acceso Restringido"}
+            </h2>
+            <p className="text-slate-500 text-sm font-medium mb-8 leading-relaxed">
+              {isAnonymousDisabled 
+                ? "El modo invitado requiere habilitar 'Anonymous Auth' en Firebase. Puedes hacerlo en la consola o entrar con tu cuenta de Google."
+                : loginError}
             </p>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               <button 
                 onClick={() => handleLogin('google')}
-                className="w-full bg-[#5D469E] text-white p-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-[#4a3683] transition-all"
+                className="w-full bg-[#5D469E] text-white p-5 rounded-2xl font-black uppercase text-sm tracking-widest hover:bg-[#4a3683] transition-all shadow-xl shadow-purple-100"
               >
-                Entrar con Google (Manual)
+                Entrar con Google
               </button>
+              
+              {!isAnonymousDisabled && (
+                <button 
+                  onClick={() => handleLogin('guest')}
+                  className="w-full bg-slate-50 text-slate-400 p-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-100 transition-all"
+                >
+                  Continuar como Invitado
+                </button>
+              )}
+              
               <button 
-                onClick={() => window.location.reload()}
-                className="text-slate-400 font-bold text-xs uppercase"
+                onClick={onBack}
+                className="text-slate-300 font-bold text-[10px] uppercase tracking-widest hover:text-slate-400 transition-colors"
               >
-                Reintentar
+                Volver
               </button>
             </div>
           </motion.div>
         )}
         
-        {!loginError && (
+        {loading && !loginError && !isAnonymousDisabled && (
           <motion.div
             animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
             transition={{ repeat: Infinity, duration: 2 }}
             className="text-6xl"
           >
             ✨
+          </motion.div>
+        )}
+
+        {!loading && !loginError && !isAnonymousDisabled && !user && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white p-12 rounded-[4rem] shadow-2xl border-8 border-white max-w-md w-full text-center"
+          >
+            <div className="text-7xl mb-8">🔐</div>
+            <h2 className="text-3xl font-black text-slate-800 mb-4 uppercase italic tracking-tighter">Iniciar Sesión</h2>
+            <p className="text-slate-500 font-medium mb-10">Elige cómo quieres gestionar tus exploradores.</p>
+            
+            <div className="space-y-4">
+              <button 
+                onClick={() => handleLogin('google')}
+                className="w-full bg-[#5D469E] text-white p-6 rounded-3xl font-black uppercase text-sm tracking-widest hover:bg-[#4a3683] transition-all shadow-2xl shadow-purple-200 flex items-center justify-center gap-3"
+              >
+                <span>Entrar con Google</span>
+              </button>
+              <button 
+                onClick={() => handleLogin('guest')}
+                className="w-full bg-slate-100 text-slate-500 p-5 rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all"
+              >
+                Entrar como Invitado
+              </button>
+            </div>
           </motion.div>
         )}
       </div>

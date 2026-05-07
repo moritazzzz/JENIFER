@@ -29,6 +29,7 @@ export default function App() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -51,6 +52,8 @@ export default function App() {
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
+
+  const [isAnonymousDisabled, setIsAnonymousDisabled] = useState(false);
 
   useEffect(() => {
     // Safety timeout to ensure loading doesn't hang indefinitely
@@ -89,6 +92,10 @@ export default function App() {
           clearTimeout(safetyTimeout);
         }).catch(err => {
            console.error("Auto guest login failed:", err);
+           if (err.code === 'auth/admin-restricted-operation') {
+             setIsAnonymousDisabled(true);
+             setAuthError("anonymous-disabled");
+           }
            setLoading(false);
            clearTimeout(safetyTimeout);
         });
@@ -153,6 +160,55 @@ export default function App() {
     );
   }
 
+  if (authError === "anonymous-disabled" || (isAnonymousDisabled && view === 'welcome')) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-100 p-6 text-center">
+        <motion.div 
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-white p-12 rounded-[4rem] shadow-2xl border-8 border-white max-w-xl w-full"
+        >
+          <div className="text-7xl mb-8">🛠️</div>
+          <h2 className="text-4xl font-black text-slate-800 mb-4 uppercase italic tracking-tighter">Configuración Requerida</h2>
+          <p className="text-slate-500 font-medium mb-8 leading-relaxed text-lg">
+            Para que el modo <b>"Explorador Invitado"</b> funcione, debes habilitar el acceso anónimo en tu Consola de Firebase.
+          </p>
+          
+          <div className="bg-slate-50 p-6 rounded-3xl text-left mb-8 space-y-4 shadow-inner">
+            <h4 className="font-black text-slate-400 text-xs uppercase tracking-widest">Pasos Rápidos:</h4>
+            <ol className="text-sm text-slate-600 space-y-3 list-decimal list-inside font-medium font-sans">
+              <li>Entra en <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-violet-600 font-black hover:underline underline-offset-4">Console.Firebase.com</a></li>
+              <li>Menú lateral &gt; <b>Compilación</b> &gt; <b>Authentication</b></li>
+              <li>Pestaña <b>Sign-in method</b> &gt; <b>Añadir nuevo proveedor</b></li>
+              <li>Selecciona <b>Anónimo</b> y actívalo.</li>
+            </ol>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <button 
+              onClick={() => {
+                setAuthError(null);
+                setView('therapist-dashboard');
+              }}
+              className="w-full bg-[#5D469E] text-white p-5 rounded-2xl font-black uppercase text-sm tracking-widest hover:bg-[#4a3683] transition-all shadow-xl shadow-purple-200"
+            >
+              Entrar con Google (Manual)
+            </button>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full bg-emerald-500 text-white p-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-emerald-600 transition-all shadow-lg"
+            >
+              Ya lo activé, Reintentar ✨
+            </button>
+            <p className="text-slate-300 text-[10px] font-bold uppercase tracking-widest">
+              O usa el botón morado para entrar con tu cuenta
+            </p>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn(
       "bg-slate-200 min-h-screen flex items-center justify-center transition-all duration-500",
@@ -175,6 +231,7 @@ export default function App() {
         {view === 'welcome' && (
           <Welcome 
             key="welcome"
+            isAnonymousDisabled={isAnonymousDisabled}
             onChildAccess={() => setView('child-selection')} 
             onTherapistAccess={() => setView('therapist-dashboard')} 
           />
@@ -191,6 +248,7 @@ export default function App() {
           <TherapistDashboard 
             key="therapist"
             user={currentUser} 
+            isAnonymousDisabled={isAnonymousDisabled}
             onBack={() => setView('welcome')} 
             onStartChild={handleStartChildAdventure}
           />

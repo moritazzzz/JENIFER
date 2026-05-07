@@ -4,7 +4,7 @@ import { type Child, type Session, type Difficulty, type ChatMessage, type LiveC
 import { WORLDS } from '../../constants';
 import { Mic, MicOff, Star, Trophy, X, Check, Volume2, Timer, Info, ArrowLeft, Sparkles, Loader2, RefreshCcw, SkipForward, ChevronRight } from 'lucide-react';
 import { Assistant } from '../chatbot/Assistant';
-import { db, auth } from '../../services/firebase';
+import { db, auth, handleFirestoreError, OperationType } from '../../services/firebase';
 import { collection, addDoc, updateDoc, doc, increment, onSnapshot, query, orderBy, limit, deleteDoc, getDocs } from 'firebase/firestore';
 import { cn } from '../../lib/utils';
 import confetti from 'canvas-confetti';
@@ -53,9 +53,9 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
 
     async function initSession() {
       setIsLoading(true);
+      const sessionsPath = `children/${child.id}/sessions`;
       try {
         // Fetch used words from previous sessions for this child
-        const sessionsPath = `children/${child.id}/sessions`;
         const q = query(collection(db, sessionsPath), orderBy('date', 'desc'), limit(5));
         const snapshot = await getDocs(q);
         const avoidWords: string[] = [];
@@ -95,7 +95,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
           setSessionActivities(shuffled as any);
         }
       } catch (err) {
-        console.error("Error initializing session:", err);
+        handleFirestoreError(err, OperationType.LIST, sessionsPath);
         // Fallback to static pool
         const pool = [...world.activities];
         const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 10);
@@ -224,8 +224,8 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
     if (activeDifficulty === 'hard' && currentActivity) {
       // Initialize completed word slots based on currentActivity.displayChallenge or word
       const initial = currentActivity.displayChallenge 
-        ? currentActivity.displayChallenge.split('').map(c => c === '_' ? '' : c)
-        : currentActivity.word.split('').map(() => '');
+        ? currentActivity.displayChallenge.split('').map((c, idx) => (c === '_' ? '' : c))
+        : currentActivity.word.split('').map(c => c === ' ' ? ' ' : '');
       setCompletedWord(initial);
     }
   }, [currentActivity, activeDifficulty]);
@@ -239,7 +239,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
       window.speechSynthesis.speak(utterance);
     }
 
-    const nextIndex = completedWord.indexOf('');
+    const nextIndex = completedWord.findIndex((char, idx) => char === '' && currentActivity.word[idx] !== ' ');
     if (nextIndex !== -1) {
       const newWord = [...completedWord];
       newWord[nextIndex] = letter;
@@ -250,14 +250,14 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
         setCurrentAttempts(0);
         handleSuccess();
         updateProfileRealtime(currentActivity.points, 1);
-      } else if (!newWord.includes('')) {
+      } else if (!newWord.some((c, idx) => c === '' && currentActivity.word[idx] !== ' ')) {
         // If filled but wrong
         setCurrentAttempts(prev => prev + 1);
         handleRetry();
         setTimeout(() => {
           const reset = currentActivity.displayChallenge 
-            ? currentActivity.displayChallenge.split('').map(c => c === '_' ? '' : c)
-            : currentActivity.word.split('').map(() => '');
+            ? currentActivity.displayChallenge.split('').map((c, idx) => (c === '_' ? '' : c))
+            : currentActivity.word.split('').map(c => c === ' ' ? ' ' : '');
           setCompletedWord(reset);
         }, 2000);
       }
@@ -284,11 +284,14 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
   };
 
   const handleSuccess = () => {
-    if (!currentActivity) return;
+    if (!currentActivity || feedback === 'success') return;
     setFeedback('success');
     setPoints(prev => prev + currentActivity.points);
     setStars(prev => prev + 1);
     setCorrectCount(prev => prev + 1);
+    
+    // Stop any ongoing recognition
+    setIsListening(false);
     
     playSound('success');
 
@@ -296,10 +299,10 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
       const phrases = [
-        "¡Muy bien! Lo has dicho fantástico.",
-        "¡Increíble! Esa es la palabra correcta.",
+        "¡Excelente! Lo has dicho fantástico.", // Moved "Excelente" here as first option
+        "¡Muy bien! Esa es la palabra correcta.",
         "¡Qué bien lo haces! Vamos al siguiente.",
-        "¡Excelente! Estás aprendiendo muy rápido.",
+        "¡Estás aprendiendo muy rápido!",
         "¡Bravo! Tu voz suena genial.",
         "¡Fenomenal! Sigue así, explorador."
       ];
@@ -359,54 +362,18 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
     }, 4500);
   };
 
-  useEffect(() => {
-    if (!child.id) return;
-
-    const path = `children/${child.id}/liveCommands`;
-    const q = query(collection(db, path), orderBy('timestamp', 'asc'));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      snapshot.docChanges().forEach(async (change) => {
-        if (change.type === 'added') {
-          const command = change.doc.data() as LiveCommand;
-          handleLiveCommand(command);
-          // Delete command after processing
-          try {
-            await deleteDoc(doc(db, path, change.doc.id));
-          } catch (e) {}
-        }
-      });
-    });
-
-    return () => unsubscribe();
-  }, [child.id]);
-
-  const handleLiveCommand = (command: LiveCommand) => {
-    switch (command.type) {
-      case 'message':
-        if (command.content && window.speechSynthesis) {
-          const utterance = new SpeechSynthesisUtterance(command.content);
-          utterance.lang = 'es-ES';
-          utterance.rate = 0.9;
-          window.speechSynthesis.speak(utterance);
-        }
-        break;
-      case 'confetti':
-        confetti({
-          particleCount: 150,
-          spread: 100,
-          origin: { y: 0.6 },
-          colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff']
-        });
-        break;
-      case 'sparkle':
-        setFeedback('success');
-        setTimeout(() => setFeedback(null), 3000);
-        break;
+  // The live command listener has been moved to the Assistant component
+  // to avoid duplication and "double speech" bugs.
+  // Actions that need to affect the Activity (like sparkles) are handled via onAction callback.
+  const handleAssistantAction = (action: string) => {
+    if (action === 'sparkle') {
+      setFeedback('success');
+      setTimeout(() => setFeedback(null), 3000);
     }
   };
 
   const updateProfileRealtime = async (pointsEarned: number, starsEarned: number) => {
+    const path = `children/${child.id}`;
     try {
       await updateDoc(doc(db, 'children', child.id), {
         points: increment(pointsEarned),
@@ -417,25 +384,31 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
         lastUpdateAt: new Date().toISOString()
       });
     } catch (e) {
-      console.error("Error updating profile in real-time:", e);
+      handleFirestoreError(e, OperationType.UPDATE, path);
     }
   };
 
   useEffect(() => {
     // Set status to active when monting
     const setStatusActive = async () => {
+      const path = `children/${child.id}`;
       try {
         await updateDoc(doc(db, 'children', child.id), { status: 'active', lastUpdateAt: new Date().toISOString() });
-      } catch (e) {}
+      } catch (e) {
+        handleFirestoreError(e, OperationType.UPDATE, path);
+      }
     };
     setStatusActive();
 
     // Set status to idle when unmounting
     return () => {
       const setStatusIdle = async () => {
+        const path = `children/${child.id}`;
         try {
           await updateDoc(doc(db, 'children', child.id), { status: 'idle', lastUpdateAt: new Date().toISOString() });
-        } catch (e) {}
+        } catch (e) {
+          handleFirestoreError(e, OperationType.UPDATE, path);
+        }
       };
       setStatusIdle();
     };
@@ -495,6 +468,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
 
     try {
       const sessionPath = `children/${child.id}/sessions`;
+      const childPath = `children/${child.id}`;
       
       const updates: any = {
         points: increment(points),
@@ -514,7 +488,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
       await updateDoc(doc(db, 'children', child.id), updates);
       onFinish(session);
     } catch (error) {
-      handleFirestoreError(error, 'write', `children/${child.id}/sessions and profile`);
+      handleFirestoreError(error, OperationType.WRITE, `children/${child.id}/sessions and profile`);
       onFinish(session);
     }
   };
@@ -692,16 +666,18 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
              >
                {activeDifficulty === 'easy' && (
                 <div className="text-center space-y-8">
-                  <motion.div 
-                    animate={{ scale: [1, 1.05, 1], rotate: [0, 2, -2, 0] }} 
-                    transition={{ duration: 3, repeat: Infinity }}
-                    className={cn(
-                      "leading-none mb-8 filter drop-shadow-2xl",
-                      child.learningStyle === 'visual' ? "text-[12rem]" : "text-[10rem]"
-                    )}
-                  >
-                    {currentActivity.image || "📢"}
-                  </motion.div>
+                  <div className="flex flex-col items-center justify-center min-h-[16rem]">
+                    <motion.div 
+                      animate={{ scale: [1, 1.05, 1], rotate: [0, 2, -2, 0] }} 
+                      transition={{ duration: 3, repeat: Infinity }}
+                      className={cn(
+                        "leading-none mb-8 filter drop-shadow-2xl select-none flex items-center justify-center",
+                        child.learningStyle === 'visual' ? "text-[8rem] md:text-[12rem]" : "text-[6rem] md:text-[10rem]"
+                      )}
+                    >
+                      {currentActivity.image || "📢"}
+                    </motion.div>
+                  </div>
                   <div className="space-y-4">
                     <h3 className="text-3xl font-black text-primary/60 uppercase tracking-tighter">
                       {child.learningStyle === 'auditivo' ? '¡Escucha con atención!' : 'Escucha y Repite'}
@@ -723,14 +699,14 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
 
               {activeDifficulty === 'medium' && (
                 <div className="text-center space-y-10 w-full">
-                  <div className="space-y-4">
+                  <div className="flex flex-col items-center justify-center min-h-[16rem] w-full">
                     <motion.div 
                       key={currentActivity.image}
                       initial={{ scale: 0.5, rotate: -10 }}
                       animate={{ scale: 1, rotate: 0 }}
                       className={cn(
-                        "leading-none mb-4 filter drop-shadow-2xl",
-                        child.learningStyle === 'visual' ? "text-[12rem]" : "text-[10rem]"
+                        "leading-none mb-4 filter drop-shadow-2xl select-none flex items-center justify-center",
+                        child.learningStyle === 'visual' ? "text-[8rem] md:text-[12rem]" : "text-[6rem] md:text-[10rem]"
                       )}
                     >
                       {currentActivity.image}
@@ -769,26 +745,31 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
 
               {activeDifficulty === 'hard' && (
                 <div className="text-center space-y-12 w-full">
-                   <div className="flex flex-col items-center gap-10">
+                    <div className="flex flex-col items-center gap-10">
                       {currentActivity.image && (
-                        <motion.div 
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          className="text-9xl filter drop-shadow-xl mb-4"
-                        >
-                          {currentActivity.image}
-                        </motion.div>
+                        <div className="min-h-[12rem] flex items-center justify-center">
+                          <motion.div 
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="text-7xl md:text-9xl filter drop-shadow-xl mb-4 select-none"
+                          >
+                            {currentActivity.image}
+                          </motion.div>
+                        </div>
                       )}
+                      
                       <div className="flex flex-wrap items-center justify-center gap-3">
                         {completedWord.map((char, i) => (
                           <motion.div 
                             key={`${currentActivity.word}-${i}`} 
-                            animate={char ? { scale: [1, 1.2, 1] } : {}}
+                            animate={char && char !== ' ' ? { scale: [1, 1.2, 1] } : {}}
                             className={cn(
-                              "w-14 h-16 rounded-2xl flex items-center justify-center text-4xl font-black transition-all",
-                              char 
+                              "w-10 h-12 md:w-14 md:h-16 rounded-xl md:rounded-2xl flex items-center justify-center text-2xl md:text-4xl font-black transition-all",
+                              char && char !== ' '
                                 ? "bg-primary text-white shadow-lg shadow-primary/20" 
-                                : "bg-white border-4 border-dashed border-gray-200 text-gray-200"
+                                : char === ' ' 
+                                  ? "bg-transparent w-6" 
+                                  : "bg-white border-2 md:border-4 border-dashed border-gray-200 text-gray-200"
                             )}
                           >
                             {char || (currentActivity.word[i] === ' ' ? ' ' : '?')}
@@ -796,15 +777,18 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
                         ))}
                       </div>
                       
-                      <div className="space-y-6">
+                      <div className="space-y-6 w-full">
                         <div className="flex flex-wrap justify-center gap-3">
-                          {currentActivity.word.replace(/\s/g, '').split('').sort(() => Math.random() - 0.5).map((char, i) => (
+                          {(currentActivity.displayChallenge 
+                            ? currentActivity.word.split('').filter((_, idx) => currentActivity.displayChallenge![idx] === '_')
+                            : currentActivity.word.replace(/\s/g, '').split('')
+                          ).sort(() => Math.random() - 0.5).map((char, i) => (
                             <motion.button
                               key={`${currentActivity.word}-btn-${i}`}
                               whileHover={{ scale: 1.1, rotate: 5 }}
                               whileTap={{ scale: 0.9 }}
                               onClick={() => addLetter(char)}
-                              className="w-14 h-14 bg-white border-2 border-gray-100 rounded-xl flex items-center justify-center text-2xl font-black text-gray-700 shadow hover:border-primary hover:text-primary transition-all uppercase"
+                              className="w-12 h-14 md:w-16 md:h-20 bg-white rounded-xl md:rounded-2xl flex items-center justify-center text-2xl md:text-4xl font-black text-gray-800 shadow-lg border-b-4 border-gray-200 hover:border-primary/40 hover:text-primary transition-all"
                             >
                               {char}
                             </motion.button>
@@ -814,7 +798,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
                           Pulsa las letras o di la palabra completa
                         </p>
                       </div>
-                   </div>
+                    </div>
                 </div>
               )}
             </motion.div>
@@ -859,6 +843,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
         performance={correctCount > currentStep ? 'excelente' : 'bueno'} 
         isVisible={true}
         onMessagesChange={setSessionChat}
+        onAction={handleAssistantAction}
       />
 
       {/* Decorative worlds icons in background */}

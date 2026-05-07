@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { ArrowLeft, UserPlus, Star, Trophy, ChevronRight } from 'lucide-react';
 import { db, auth } from '../../services/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../../services/firebase';
 import { type Child } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -21,14 +22,15 @@ export function ChildSelection({ onSelect, onCreateNew, onBack }: ChildSelection
   }, []);
 
   const fetchMyChildren = async () => {
+    const path = 'children';
     try {
       // Buscamos niños asociados al ID del terapeuta actual (o cuenta invidado)
       const therapistId = auth.currentUser?.uid || 'guest-therapist';
-      const q = query(collection(db, 'children'), where('therapistId', '==', therapistId));
+      const q = query(collection(db, path), where('therapistId', '==', therapistId));
       const snapshot = await getDocs(q);
-      setChildren(snapshot.docs.map(doc => doc.data() as Child));
+      setChildren(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Child)));
     } catch (error) {
-      console.error("Error fetching children:", error);
+      handleFirestoreError(error, OperationType.LIST, path);
     } finally {
       setLoading(false);
     }

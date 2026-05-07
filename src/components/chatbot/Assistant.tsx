@@ -5,7 +5,7 @@ import { type ChatMessage, type LiveCommand } from '../../types';
 import { getAssistantResponse } from '../../services/gemini';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '../../lib/utils';
-import { db } from '../../services/firebase';
+import { db, handleFirestoreError, OperationType } from '../../services/firebase';
 import { collection, query, onSnapshot, orderBy, limit, deleteDoc, doc } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 
@@ -15,6 +15,7 @@ interface AssistantProps {
   performance: string;
   isVisible: boolean;
   onMessagesChange?: (messages: ChatMessage[]) => void;
+  onAction?: (action: string) => void;
 }
 
 // Speech synthesis helper
@@ -24,12 +25,12 @@ const speak = (text: string) => {
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'es-ES';
-  utterance.rate = 0.7; // Slower for kids
-  utterance.pitch = 1.2; // Child-friendly pitch
+  utterance.rate = 0.85; // Slightly faster but still child-friendly
+  utterance.pitch = 1.1; 
   window.speechSynthesis.speak(utterance);
 };
 
-export function Assistant({ childId, childName, performance, isVisible, onMessagesChange }: AssistantProps) {
+export function Assistant({ childId, childName, performance, isVisible, onMessagesChange, onAction }: AssistantProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'assistant', content: `¡Hola ${childName}! Soy tu Guía Mágico. ¡Estoy aquí para divertirnos juntos!` }
   ]);
@@ -50,8 +51,9 @@ export function Assistant({ childId, childName, performance, isVisible, onMessag
   useEffect(() => {
     if (!childId) return;
 
+    const path = `children/${childId}/liveCommands`;
     const q = query(
-      collection(db, `children/${childId}/liveCommands`),
+      collection(db, path),
       orderBy('timestamp', 'desc'),
       limit(1)
     );
@@ -63,6 +65,8 @@ export function Assistant({ childId, childName, performance, isVisible, onMessag
           handleCommand(command, change.doc.id);
         }
       });
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, path);
     });
 
     return () => unsubscribe();
@@ -88,29 +92,23 @@ export function Assistant({ childId, childName, performance, isVisible, onMessag
       setIsSparkling(true);
       setTimeout(() => setIsSparkling(false), 3000);
       speak("¡Magia viva! ¡Qué brillante!");
+      onAction?.('sparkle');
     }
 
     // Cleanup command
     if (childId) {
+      const path = `children/${childId}/liveCommands/${docId}`;
       try {
         await deleteDoc(doc(db, `children/${childId}/liveCommands`, docId));
       } catch (e) {
-        console.error("Error deleting command:", e);
+        handleFirestoreError(e, OperationType.DELETE, path);
       }
     }
   };
 
-  useEffect(() => {
-    if (performance.includes('excelente')) {
-       const msg = `¡Lo estás haciendo increíble, ${childName}!`;
-       setMessages(prev => {
-         if (prev[prev.length - 1].content === msg) return prev;
-         return [...prev, { role: 'assistant', content: msg }];
-       });
-       speak(msg);
-    }
-  }, [performance]);
-
+  // Performance-based feedback removed as it conflicts with Activity.tsx feedback
+  // to avoid the "double praise" bug.
+  
   if (!isVisible) return null;
 
   return (
