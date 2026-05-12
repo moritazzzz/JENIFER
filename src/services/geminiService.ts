@@ -22,7 +22,7 @@ export async function generateSessionActivities(
   age: number,
   learningStyle: string,
   avoidWords: string[] = [],
-  count: number = 10
+  count: number = 15
 ): Promise<GeneratedActivity[]> {
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
@@ -39,7 +39,7 @@ export async function generateSessionActivities(
   };
 
   const prompt = `Actúa como un logopeda pediátrico experto de habla HISPANA. 
-  Genera ${count} actividades ÚNICAS, CREATIVAS y VARIADAS para un niño de ${age} años.
+  Genera EXACTAMENTE ${count} actividades ÚNICAS, CREATIVAS y VARIADAS para un niño de ${age} años.
   
   CONTEXTO CLAVE:
   - Nivel de Dificultad (Mundo): ${difficulty.toUpperCase()}
@@ -49,23 +49,36 @@ export async function generateSessionActivities(
   ${avoidWords.length > 0 ? `- EVITA ESTAS PALABRAS (ya usadas recientemente): ${avoidWords.join(', ')}` : ''}
   
   REGLAS DE VOCABULARIO Y TERAPIA (CRÍTICO):
-  1. TODAS las palabras y frases deben ser en ESPAÑOL DE ESPAÑA/LATAM. NUNCA uses inglés (no uses 'hard', 'easy', etc. como palabras del reto).
+  1. TODAS las palabras y frases deben ser en ESPAÑOL DE ESPAÑA/LATAM. NUNCA uses inglés.
   2. Adapta el contenido específicamente para un niño de ${age} años.
-  3. NIVEL PRESILÁBICO: Prioriza reconocimiento de imagen y sonido inicial.
-  4. NIVEL SILÁBICO: Divide claramente con guiones: 'PA-TO'.
-  5. NIVEL ALFABÉTICO: Palabras completas y retos de formación.
-  6. ESTILO VISUAL: Referencias directas a la forma y color de la imagen.
-  7. ESTILO AUDITIVO: Centrado en onomatopeyas, rimas y sonidos.
-  8. ESTILO ESCRITURA: Centrado en las letras y su orden.
-  9. VARIABILIDAD TOTAL: Usa comida, objetos del hogar, ropa, partes del cuerpo, animales, transporte.
-  10. Si la dificultad es 'HARD', usa PALABRAS CORTAS O MEDIANAS (máximo 10 letras) que sean retos interesantes (ej: 'guitarra', 'conejo'). EVITA FRASES LARGAS.
-  11. 'displayChallenge' (solo en HARD): Debe ser la palabra con 2 o 3 letras reemplazadas por guiones bajos (ej: 'GU_TA_RA').
+  3. NIVEL MEDIO (MEDIUM): DEBES incluir el campo 'options' con 3 opciones (la correcta y 2 distractores).
+  4. NIVEL DIFÍCIL (HARD): DEBES incluir el campo 'displayChallenge' (ej: 'M_RC_ÉL_GO').
+  5. NIVEL PRESILÁBICO: Prioriza reconocimiento de imagen y sonido inicial.
+  6. NIVEL SILÁBICO: Divide claramente con guiones: 'PA-TO'.
+  7. NIVEL ALFABÉTICO: Palabras completas y retos de formación.
+  8. ESTILO VISUAL: Referencias directas a la forma y color de la imagen.
+  9. ESTILO AUDITIVO: Centrado en onomateyas, rimas y sonidos.
+  10. ESTILO ESCRITURA: Centrado en las letras y su orden.
+  11. VARIABILIDAD TOTAL: Usa comida, objetos del hogar, ropa, partes del cuerpo, animales, transporte.
+  12. DEBES devolver EXACTAMENTE ${count} objetos en el arreglo JSON.
   
-  JSON SCHEMA: Devuelve un arreglo JSON con: id, title, word, syllables, points, hint, pronunciationTip, instruction, image, options (solo mediano), displayChallenge (solo difícil, ej: 'M_RC_ÉL_GO').
+  JSON SCHEMA: Devuelve un arreglo JSON con: id, title, word, syllables, points, hint, pronunciationTip, instruction, image.
+  - Si difficulty='MEDIUM': Agrega "options": ["Opción 1", "Opción 2", "Opción Correcta"] (siempre 3 opciones).
+  - Si difficulty='HARD': Agrega "displayChallenge": "Palabra con guiones" (ej: "S_LL_").
   
-  EJEMPLO JSON:
+  EJEMPLO JSON PARA DIFICULTAD ${difficulty.toUpperCase()}:
   [
-    {"id": "ai-1", "title": "Amigo del Hogar", "word": "Silla", "image": "🪑", "syllables": "Si-lla", "points": 15, "hint": "Sirve para sentarse y tiene 4 patas", "pronunciationTip": "Pon tus dientes juntos y sopla SSS", "instruction": "¡Mira esta silla! ¿Cómo se dice?"}
+    {
+      "id": "ai-1", 
+      "title": "Amigo del Hogar", 
+      "word": "Silla", 
+      "image": "🪑", 
+      "syllables": "Si-lla", 
+      "points": ${difficulty === 'easy' ? 15 : difficulty === 'medium' ? 30 : 50}, 
+      "hint": "Sirve para sentarse", 
+      "pronunciationTip": "Dientes juntos SSS", 
+      "instruction": "¡Mira la silla! ¿Cómo se dice?"${difficulty === 'medium' ? ',\n      "options": ["Mesa", "Cama", "Silla"]' : ''}${difficulty === 'hard' ? ',\n      "displayChallenge": "S_LL_"' : ''}
+    }
   ]`;
 
   try {

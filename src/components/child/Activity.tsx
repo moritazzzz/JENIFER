@@ -76,7 +76,8 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
           child.learningLevel, 
           child.age,
           child.learningStyle,
-          uniqueAvoidWords
+          uniqueAvoidWords,
+          15
         );
         
         // Safety check: Filter out any activity where the word is just the difficulty name
@@ -87,18 +88,38 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
         );
 
         if (aiActivities && aiActivities.length > 0) {
+          // Double check options for medium level
+          if (activeDifficulty === 'medium') {
+            aiActivities = aiActivities.map(a => {
+              if (!a.options || a.options.length < 3) {
+                const distractors = ['Mesa', 'Libro', 'Pelota', 'Casa', 'Perro', 'Gato'].filter(d => d.toLowerCase() !== a.word.toLowerCase());
+                const shuffledDistractors = distractors.sort(() => Math.random() - 0.5).slice(0, 2);
+                return { ...a, options: [a.word, ...shuffledDistractors].sort(() => Math.random() - 0.5) };
+              }
+              return a;
+            });
+          }
           setSessionActivities(aiActivities);
         } else {
           // Fallback to static pool
           const pool = [...world.activities];
-          const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 10);
+          let shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 15);
+          
+          // Add options for medium fallback if missing
+          if (activeDifficulty === 'medium') {
+            shuffled = shuffled.map((a: any) => ({
+              ...a,
+              options: a.options || [a.word, 'Mesa', 'Libro'].sort(() => Math.random() - 0.5)
+            }));
+          }
+          
           setSessionActivities(shuffled as any);
         }
       } catch (err) {
         handleFirestoreError(err, OperationType.LIST, sessionsPath);
         // Fallback to static pool
         const pool = [...world.activities];
-        const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 10);
+        const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 15);
         setSessionActivities(shuffled as any);
       } finally {
         setIsLoading(false);
@@ -548,7 +569,7 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
 
   return (
     <div className={cn(
-      "min-h-full bg-gray-50 flex flex-col p-6 md:p-10 relative overflow-y-auto custom-scrollbar transition-all duration-500",
+      "min-h-full bg-gray-50 flex flex-col relative overflow-y-auto custom-scrollbar transition-all duration-500",
       isListening && "ring-[20px] ring-red-500/10 bg-red-50/30"
     )}>
       <AnimatePresence>
@@ -587,82 +608,80 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
         )}
       </AnimatePresence>
 
-      <div className="max-w-7xl mx-auto w-full flex flex-col flex-1 gap-12 relative z-10">
-        <header className="flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-4 bg-white/80 backdrop-blur-md px-6 py-3 rounded-full border-4 border-white shadow-xl w-full md:w-auto">
-            <div className="w-14 h-14 bg-primary/20 rounded-full border-4 border-white shadow-inner flex items-center justify-center text-3xl">
+      <div className="max-w-7xl mx-auto w-full flex flex-col flex-1 gap-4 md:gap-6 relative z-10 p-4 md:p-6">
+        <header className="flex flex-col xl:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-4 bg-white/80 backdrop-blur-md px-6 py-2 rounded-full border-4 border-white shadow-xl w-full xl:w-auto">
+            <div className="w-12 h-12 bg-primary/20 rounded-full border-4 border-white shadow-inner flex items-center justify-center text-2xl shrink-0">
                {child.avatar === 'lion' ? '🦁' : child.avatar === 'rabbit' ? '🐰' : child.avatar === 'panda' ? '🐼' : child.avatar === 'fox' ? '🦊' : child.avatar === 'owl' ? '🦉' : '🦄'}
             </div>
-            <div className="flex-1">
-              <h1 className="text-2xl font-black text-primary tracking-tight leading-none uppercase">{child.name}</h1>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-black text-primary tracking-tight leading-none uppercase truncate">{child.name}</h1>
               <div className="flex items-center gap-2 mt-1">
-                <div className="w-full md:w-32 h-3 bg-slate-200 rounded-full overflow-hidden">
+                <div className="w-full md:w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
                    <motion.div 
                       className="h-full bg-primary" 
-                      animate={{ width: `${((currentStep + 1) / (sessionActivities.length || 5)) * 100}%` }} 
+                      animate={{ width: `${((currentStep + 1) / (sessionActivities.length || 15)) * 100}%` }} 
                    />
                 </div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase shrink-0">{currentStep + 1}/{sessionActivities.length}</span>
+                <span className="text-[9px] font-bold text-slate-500 uppercase shrink-0">{currentStep + 1}/{sessionActivities.length}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-4 w-full md:w-auto justify-center">
+          <div className="flex flex-wrap gap-2 w-full xl:w-auto justify-center">
             <button 
               onClick={() => setShowMiniGame(true)}
-              className="flex items-center gap-3 bg-white/80 backdrop-blur-md px-6 py-3 rounded-full border-4 border-white shadow-xl text-emerald-500 font-black hover:bg-emerald-50 transition-all hover:scale-105 active:scale-95 group"
-              title="Juego de bonus"
+              className="flex items-center gap-2 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border-4 border-white shadow-xl text-emerald-500 font-black hover:bg-emerald-50 transition-all hover:scale-105 active:scale-95 group shrink-0"
             >
-              <Sparkles className="w-5 h-5 text-emerald-400 group-hover:scale-125 transition-transform" />
-              <span className="uppercase text-[10px] tracking-widest italic">Juego Bonus</span>
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span className="uppercase text-[8px] tracking-widest italic">Bonus</span>
             </button>
 
             <button 
               onClick={resetCurrentActivity}
-              className="flex items-center gap-3 bg-white/80 backdrop-blur-md px-6 py-3 rounded-full border-4 border-white shadow-xl text-primary font-black hover:bg-primary-light transition-all hover:scale-105 active:scale-95 group"
-              title="Reiniciar ejercicio actual"
+              className="flex items-center gap-2 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border-4 border-white shadow-xl text-primary font-black hover:bg-primary-light transition-all hover:scale-105 active:scale-95 group shrink-0"
             >
-              <RefreshCcw className="w-5 h-5 text-primary/60 group-hover:rotate-180 transition-transform duration-500" />
-              <span className="uppercase text-[10px] tracking-widest italic">Reiniciar</span>
+              <RefreshCcw className="w-4 h-4 text-primary/60" />
+              <span className="uppercase text-[8px] tracking-widest italic">Reiniciar</span>
             </button>
 
             <button 
               onClick={skipActivity}
-              className="flex items-center gap-3 bg-white/80 backdrop-blur-md px-6 py-3 rounded-full border-4 border-white shadow-xl text-orange-500 font-black hover:bg-orange-50 transition-all hover:scale-105 active:scale-95 group"
-              title="Pasar a la siguiente palabra"
+              className="flex items-center gap-2 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border-4 border-white shadow-xl text-orange-500 font-black hover:bg-orange-50 transition-all hover:scale-105 active:scale-95 group shrink-0"
             >
-              <SkipForward className="w-5 h-5 text-orange-400 group-hover:translate-x-1 transition-transform" />
-              <span className="uppercase text-[10px] tracking-widest italic">Saltar</span>
+              <SkipForward className="w-4 h-4 text-orange-400" />
+              <span className="uppercase text-[8px] tracking-widest italic">Saltar</span>
             </button>
 
-            <div className="flex items-center gap-3 bg-white/80 backdrop-blur-md px-5 py-2 rounded-full border-4 border-white shadow-lg">
-               <Timer className="w-5 h-5 text-red-500" />
-               <span className="text-xl font-black text-slate-700">{formatTime(timeRemaining)}</span>
+            <div className="flex items-center gap-3 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border-4 border-white shadow-lg shrink-0">
+               <Timer className="w-4 h-4 text-red-500" />
+               <span className="text-base font-black text-slate-700">{formatTime(timeRemaining)}</span>
             </div>
+
             <button 
               onClick={onCancel}
-              className="flex items-center gap-3 bg-white/80 backdrop-blur-md px-6 py-3 rounded-full border-4 border-white shadow-xl text-slate-500 font-bold hover:text-red-500 transition-colors hover:scale-105 active:scale-95 group"
+              className="flex items-center gap-2 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border-4 border-white shadow-xl text-slate-500 font-bold hover:text-red-500 transition-colors hover:scale-105 active:scale-95 group shrink-0"
             >
-              <ArrowLeft className="w-5 h-5 text-slate-300 group-hover:text-red-400 transition-colors" />
-              <span className="uppercase text-sm tracking-widest font-black italic">Volver</span>
+              <ArrowLeft className="w-4 h-4 text-slate-300 group-hover:text-red-400 transition-colors" />
+              <span className="uppercase text-[8px] tracking-widest font-black italic">Salir</span>
             </button>
           </div>
         </header>
 
-        <main className="flex-1 flex flex-col items-center justify-center py-6">
-          <div className="text-center mb-12">
-             <p className="text-sm font-bold text-primary uppercase tracking-[0.2em] mb-2">Mundo {difficultyNames[activeDifficulty as keyof typeof difficultyNames]}</p>
-             <h2 className="text-4xl font-black text-gray-800 italic">{world.name}</h2>
-             <p className="text-gray-500 font-bold mt-1 uppercase tracking-widest text-[10px]">{world.description}</p>
+        <main className="flex-1 flex flex-col items-center py-2 md:py-4">
+          <div className="text-center mb-4">
+             <p className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-1">Mundo {difficultyNames[activeDifficulty as keyof typeof difficultyNames]}</p>
+             <h2 className="text-2xl md:text-3xl font-black text-gray-800 italic">{world.name}</h2>
+             <p className="text-gray-400 font-bold mt-1 uppercase tracking-widest text-[9px]">{world.description}</p>
           </div>
 
-          <div className="flex flex-col items-center max-w-4xl w-full">
+          <div className="flex flex-col items-center max-w-4xl w-full gap-4 mb-8">
             {currentActivity && (
              <motion.div 
                key={currentStep}
                initial={{ opacity: 0, y: 10, scale: 0.95 }}
                animate={{ opacity: 1, y: 0, scale: 1 }}
-               className="w-full max-w-4xl bg-white rounded-[3rem] p-8 md:p-14 shadow-2xl shadow-primary/10 border-b-8 border-gray-100 flex flex-col items-center"
+               className="w-full bg-white rounded-[2rem] md:rounded-[2.5rem] p-4 md:p-8 shadow-2xl shadow-primary/10 border-b-8 border-gray-100 flex flex-col items-center"
              >
                {activeDifficulty === 'easy' && (
                 <div className="text-center space-y-8">
@@ -698,46 +717,52 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
               )}
 
               {activeDifficulty === 'medium' && (
-                <div className="text-center space-y-10 w-full">
-                  <div className="flex flex-col items-center justify-center min-h-[16rem] w-full">
+                <div className="text-center space-y-6 md:space-y-10 w-full">
+                  <div className="flex flex-col items-center justify-center min-h-[12rem] md:min-h-[16rem] w-full">
                     <motion.div 
                       key={currentActivity.image}
                       initial={{ scale: 0.5, rotate: -10 }}
                       animate={{ scale: 1, rotate: 0 }}
                       className={cn(
-                        "leading-none mb-4 filter drop-shadow-2xl select-none flex items-center justify-center",
-                        child.learningStyle === 'visual' ? "text-[8rem] md:text-[12rem]" : "text-[6rem] md:text-[10rem]"
+                        "leading-none mb-2 md:mb-4 filter drop-shadow-2xl select-none flex items-center justify-center",
+                        child.learningStyle === 'visual' ? "text-[6rem] md:text-[12rem]" : "text-[5rem] md:text-[10rem]"
                       )}
                     >
-                      {currentActivity.image}
+                      {currentActivity.image || "📢"}
                     </motion.div>
-                    <h3 className="text-3xl font-black text-gray-800 tracking-tight italic">
+                    <h3 className="text-xl md:text-3xl font-black text-gray-800 tracking-tight italic">
                       {child.learningStyle === 'escritura' ? '¿Cómo se escribe este objeto?' : '¿Qué ves en la imagen?'}
                     </h3>
                   </div>
                   
                   {child.learningStyle === 'escritura' && (
-                    <div className="bg-primary/5 p-4 rounded-2xl border-2 border-dashed border-primary/20 flex flex-col items-center gap-2 mb-4">
-                       <p className="text-primary font-black uppercase text-xs tracking-widest leading-none">Pista de escritura:</p>
-                       <p className="text-2xl font-black text-primary tracking-[0.5em]">{currentActivity.word.split('').map((c, i) => i === 0 || i === currentActivity.word.length - 1 ? c : '_').join('')}</p>
+                    <div className="bg-primary/5 p-3 md:p-4 rounded-2xl border-2 border-dashed border-primary/20 flex flex-col items-center gap-2 mb-2 md:mb-4">
+                       <p className="text-primary font-black uppercase text-[10px] tracking-widest leading-none">Pista de escritura:</p>
+                       <p className="text-xl md:text-2xl font-black text-primary tracking-[0.4em] md:tracking-[0.5em]">{currentActivity.word.split('').map((c, i) => i === 0 || i === currentActivity.word.length - 1 ? c : '_').join('')}</p>
                     </div>
                   )}
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-                    {currentActivity.options?.map((opt, i) => (
-                      <motion.button
-                        key={i}
-                        whileHover={{ scale: 1.05, y: -5 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => validateOption(opt)}
-                        className="bg-primary-light hover:bg-primary hover:text-white text-primary p-6 rounded-[2rem] border-b-4 border-primary/20 font-black text-2xl transition-colors shadow-lg shadow-primary/10"
-                      >
-                        {opt}
-                      </motion.button>
-                    ))}
-                  </div>
                   
-                  <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">
+                  {currentActivity.options && currentActivity.options.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 w-full">
+                      {currentActivity.options.map((opt, i) => (
+                        <motion.button
+                          key={i}
+                          whileHover={{ scale: 1.05, y: -5 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => validateOption(opt)}
+                          className="bg-primary-light hover:bg-primary hover:text-white text-primary p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border-b-4 border-primary/20 font-black text-xl md:text-2xl transition-colors shadow-lg shadow-primary/10"
+                        >
+                          {opt}
+                        </motion.button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-8 bg-slate-100 rounded-[2rem] border-4 border-dashed border-slate-200">
+                      <p className="text-slate-400 font-black uppercase tracking-widest text-sm">Cargando opciones mágicas...</p>
+                    </div>
+                  )}
+                  
+                  <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] md:text-xs">
                     O usa el micrófono para decirlo
                   </p>
                 </div>
@@ -804,17 +829,17 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
             </motion.div>
             )}
 
-           <div className="mt-12 flex flex-col items-center gap-4">
+           <div className="mt-4 mb-16 flex flex-col items-center gap-3">
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={startListening}
                 className={cn(
-                  "p-10 rounded-full shadow-2xl transition-all relative overflow-hidden",
-                  isListening ? "bg-red-500 scale-110 ring-8 ring-red-100" : "bg-primary hover:bg-primary-dark shadow-primary/20"
+                  "p-8 rounded-full shadow-2xl transition-all relative overflow-hidden",
+                  isListening ? "bg-red-500 scale-105 ring-8 ring-red-100" : "bg-primary hover:bg-primary-dark shadow-primary/20"
                 )}
               >
-                {isListening ? <Mic className="w-12 h-12 text-white animate-pulse" /> : <Mic className="w-12 h-12 text-white" />}
+                {isListening ? <Mic className="w-10 h-10 md:w-12 md:h-12 text-white animate-pulse" /> : <Mic className="w-10 h-10 md:w-12 md:h-12 text-white" />}
                 {isListening && (
                   <motion.div 
                     initial={{ scale: 0.8, opacity: 0.5 }}
@@ -824,11 +849,11 @@ export function Activity({ child, difficulty, onFinish, onCancel }: ActivityProp
                   />
                 )}
               </motion.button>
-              <p className={cn("text-lg font-bold uppercase tracking-widest", isListening ? "text-red-500" : "text-gray-400")}>
+              <p className={cn("text-xs md:text-sm font-bold uppercase tracking-widest", isListening ? "text-red-500" : "text-gray-400")}>
                 {isListening ? "¡Habla ahora!" : "Presiona para hablar"}
               </p>
               {transcription && (
-                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4 bg-gray-100 px-6 py-2 rounded-full font-medium text-gray-600 italic">
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 bg-gray-100 px-4 py-1.5 rounded-full text-xs font-medium text-gray-600 italic">
                    Dijiste: "{transcription}"
                 </motion.p>
               )}

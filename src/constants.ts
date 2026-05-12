@@ -37,6 +37,11 @@ export const WORLDS = {
       { id: 'v-13', title: 'Casa Linda', image: '🏠', word: 'Casa', syllables: 'Ca-sa', points: 15, hint: 'Donde vivimos', pronunciationTip: 'Haz el sonido K desde atrás y sopla como serpiente.' },
       { id: 'v-14', title: 'Bota Azul', image: '🥾', word: 'Bota', syllables: 'Bo-ta', points: 15, hint: 'Para los pies', pronunciationTip: 'Junta los labios suave para la B.' },
       { id: 'v-15', title: 'Rosa Roja', image: '🌹', word: 'Rosa', syllables: 'Ro-sa', points: 25, hint: 'Una flor hermosa', pronunciationTip: 'Haz que tu lengua vibre un poquito para la R.' },
+      { id: 'v-16', title: 'Nube Blanca', image: '☁️', word: 'Nube', syllables: 'Nu-be', points: 15, hint: 'Está en el cielo', pronunciationTip: 'Sube la lengua para la N y junta labios suave para la B.' },
+      { id: 'v-17', title: 'Pez Agua', image: '🐟', word: 'Pez', syllables: 'Pez', points: 20, hint: 'Nada en el mar', pronunciationTip: 'Explota la P y termina con un sonido suave de S.' },
+      { id: 'v-18', title: 'Reloj Tic', image: '⏰', word: 'Reloj', syllables: 'Re-loj', points: 25, hint: 'Dice la hora', pronunciationTip: 'Vibra la lengua al principio y termina con un suspiro.' },
+      { id: 'v-19', title: 'Vaca Muu', image: '🐮', word: 'Vaca', syllables: 'Va-ca', points: 15, hint: 'Nos da leche', pronunciationTip: 'Dientes en el labio para la V y sonido de garganta para la C.' },
+      { id: 'v-20', title: 'Yoyo Sube', image: '🪀', word: 'Yoyo', syllables: 'Yo-yo', points: 15, hint: 'Baja y sube', pronunciationTip: 'Di I-O muy rápido.' },
     ]
   },
   medium: {
@@ -60,6 +65,11 @@ export const WORLDS = {
       { id: 'm-13', title: 'Tiburón Feroz', image: '🦈', word: 'Tiburón', syllables: 'Ti... bu... rón', points: 45, pronunciationTip: 'Sopla suave para la T y vibra para la R.' },
       { id: 'm-14', title: 'Zapato Nuevo', image: '👟', word: 'Zapato', syllables: 'Za... pa... to', points: 35, pronunciationTip: 'Usa el sonido S para la Z.' },
       { id: 'm-15', title: 'Queso Rico', image: '🧀', word: 'Queso', syllables: 'Que... so', points: 35, pronunciationTip: 'Haz el sonido K y luego el de la serpiente.' },
+      { id: 'm-16', title: 'Ballena Azul', image: '🐋', word: 'Ballena', syllables: 'Ba... lle... na', points: 40, pronunciationTip: 'Labios juntos para B, lengua al techo para LL.' },
+      { id: 'm-17', title: 'Delfín Alegre', image: '🐬', word: 'Delfín', syllables: 'Del... fín', points: 45, pronunciationTip: 'Lengua al techo para L, dientes al labio para F.' },
+      { id: 'm-18', title: 'Hormiga Fuerte', image: '🐜', word: 'Hormiga', syllables: 'Hor... mi... ga', points: 35, pronunciationTip: 'Vibra un poco para R, sonido de garganta para G.' },
+      { id: 'm-19', title: 'Libro Mágico', image: '📚', word: 'Libro', syllables: 'Li... bro', points: 30, pronunciationTip: 'Lengua arriba para L, labios juntos para B y vibra para R.' },
+      { id: 'm-20', title: 'Zapato Veloz', image: '👟', word: 'Zapato', syllables: 'Za... pa... to', points: 30, pronunciationTip: 'Sonido S suave al principio.' },
     ]
   },
   hard: {
@@ -80,6 +90,10 @@ export const WORLDS = {
       { id: 'h-10', title: 'Naturaleza', image: '🌺', word: 'Flores', syllables: 'Flo-res', points: 80, pronunciationTip: 'El sonido FL necesita un soplo suave.' },
       { id: 'h-11', title: 'Animales', image: '🦒', word: 'Jirafa', syllables: 'Ji-ra-fa', points: 70, pronunciationTip: 'La CH suena como un pequeño estornudo suave.' },
       { id: 'h-12', title: 'Espacio', image: '🚀', word: 'Cohete', syllables: 'Co-he-te', points: 90, pronunciationTip: 'Es una palabra larga, tómate tu tiempo.' },
+      { id: 'h-13', title: 'Medicina', image: '💊', word: 'Pastilla', syllables: 'Pas-ti-lla', points: 70, pronunciationTip: 'Sopla para la S y lengua al techo para la LL.' },
+      { id: 'h-14', title: 'Limpieza', image: '🧼', word: 'Jabón', syllables: 'Ja-bón', points: 60, pronunciationTip: 'Suspiro fuerte para la J y labios juntos para la B.' },
+      { id: 'h-15', title: 'Instrumento', image: '🥁', word: 'Tambor', syllables: 'Tam-bor', points: 75, pronunciationTip: 'Golpea la lengua para T y vibra al final para R.' },
+      { id: 'h-16', title: 'Fruta Rica', image: '🍒', word: 'Cereza', syllables: 'Ce-re-za', points: 80, pronunciationTip: 'Sonido S suave y vibra la punta de la lengua.' },
     ]
   }
 };
